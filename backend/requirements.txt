@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+pydantic
+sqlalchemy
+psycopg2-binary  # Sterownik do połączenia Pythona z PostgreSQL
