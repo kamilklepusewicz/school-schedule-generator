@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # --- 1. BAZA DANYCH ---
+  db:
+    image: postgres:15-alpine
+    container_name: school_schedule_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # --- 2. BACKEND (FASTAPI) ---
+  api:
+    build: 
+      context: ./backend
+    container_name: school_schedule_api
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - DATABASE_URL=postgresql://{DB_USER}:{DB_PASS}@db:5432/{DB_NAME}
+    depends_on:
+      - db
+
+  # --- 3. FRONTEND ---
+  #web:
+    #build: 
+      #context: ./frontend
+    #container_name: school_schedule_web
+    #restart: always
+    #ports:
+      # Dałem to pod React, jeśli robisz Tomek w czymś innym, to zmień porty
+      #- "3000:3000" 
+    #volumes:
+     # - ./frontend:/app
+      # Ukrywamy folder node_modules z naszego komputera, żeby używał tego z kontenera
+      #- /app/node_modules
+    #depends_on:
+     # - api # Frontend wystartuje, gdy backend będzie gotowy
+
+volumes:
+  postgres_data:
