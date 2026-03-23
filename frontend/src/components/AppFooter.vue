@@ -1,7 +1,6 @@
 <template>
   <footer class="app-footer card">
     <p class="app-footer__text">School Schedule Generator</p>
-    <p class="app-footer__meta">Template-ready layout for forms, tables, and planning modules.</p>
   </footer>
 </template>
 
