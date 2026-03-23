@@ -26,25 +26,26 @@ services:
     volumes:
       - ./backend:/app
     environment:
-      - DATABASE_URL=postgresql://{DB_USER}:{DB_PASS}@db:5432/{DB_NAME}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@db:5432/${DB_NAME}
     depends_on:
       - db
 
   # --- 3. FRONTEND ---
-  #web:
-    #build: 
-      #context: ./frontend
-    #container_name: school_schedule_web
-    #restart: always
-    #ports:
-      # Dałem to pod React, jeśli robisz Tomek w czymś innym, to zmień porty
-      #- "3000:3000" 
-    #volumes:
-     # - ./frontend:/app
-      # Ukrywamy folder node_modules z naszego komputera, żeby używał tego z kontenera
-      #- /app/node_modules
-    #depends_on:
-     # - api # Frontend wystartuje, gdy backend będzie gotowy
+  web:
+    build:
+      context: ./frontend
+    container_name: school_schedule_web
+    restart: always
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - api
 
 volumes:
   postgres_data:

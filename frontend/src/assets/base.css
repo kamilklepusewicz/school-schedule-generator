@@ -1,0 +1,134 @@
+:root {
+  --font-family-base: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+
+  --color-page-start: #edf2f7;
+  --color-page-end: #f7fafc;
+  --color-surface: #ffffff;
+  --color-surface-2: #f8fafc;
+  --color-text-main: #1f2937;
+  --color-text-muted: #637083;
+  --color-border: #d7dde5;
+  --color-border-strong: #c8d2de;
+
+  --color-accent: #4d6f96;
+  --color-accent-soft: #e7eff8;
+  --color-accent-strong: #2f4f73;
+
+  --color-danger: #b4534f;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --shadow-soft: 0 8px 22px rgba(32, 46, 62, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-family-base);
+  line-height: 1.5;
+  color: var(--color-text-main);
+  background: linear-gradient(160deg, var(--color-page-start), var(--color-page-end));
+}
+
+.card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.section-title {
+  margin: 0 0 0.9rem;
+  font-size: 1.1rem;
+}
+
+.label-text {
+  font-weight: 600;
+  color: var(--color-text-main);
+}
+
+.field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.control {
+  width: 100%;
+  padding: 0.58rem 0.7rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-main);
+  font: inherit;
+}
+
+.control:focus {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 25%, white);
+  outline-offset: 1px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  padding: 0.62rem 0.86rem;
+  min-height: 2.4rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--color-surface-2);
+  color: var(--color-text-main);
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent-strong);
+  color: #fff;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 420px;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+  padding: 0.5rem 0.55rem;
+}
+
+.table th {
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font-weight: 700;
+}
