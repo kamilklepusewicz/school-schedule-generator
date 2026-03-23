@@ -16,7 +16,7 @@
 .app-footer__meta {
   margin: 0;
 }
-
+  
 .app-footer__meta {
   color: var(--color-text-muted);
 }
