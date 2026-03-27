@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 
 const props = defineProps({
   entityName: {
@@ -32,6 +32,9 @@ const emit = defineEmits(['create', 'update', 'delete']);
 
 const formState = reactive({});
 const mode = reactive({ type: 'create', id: null });
+const pageSizeOptions = [10, 20, 50];
+const selectedPageSize = ref(pageSizeOptions[0]);
+const displayedCount = ref(pageSizeOptions[0]);
 
 function getDefaultValue(field) {
   if (field.type === 'number') {
@@ -52,11 +55,34 @@ watch(
   () => props.entityName,
   () => {
     resetForm();
+    displayedCount.value = selectedPageSize.value;
   },
   { immediate: true }
 );
 
+watch(
+  () => props.rows.length,
+  () => {
+    if (displayedCount.value > props.rows.length) {
+      displayedCount.value = props.rows.length;
+    }
+  }
+);
+
 const hasRows = computed(() => props.rows.length > 0);
+const visibleRows = computed(() => props.rows.slice(0, displayedCount.value));
+const hasMoreRows = computed(() => displayedCount.value < props.rows.length);
+
+function onPageSizeChange() {
+  displayedCount.value = Math.min(selectedPageSize.value, props.rows.length);
+}
+
+function loadNextRows() {
+  displayedCount.value = Math.min(
+    displayedCount.value + selectedPageSize.value,
+    props.rows.length
+  );
+}
 
 function displayValue(row, field) {
   const raw = row[field.key];
@@ -164,11 +190,24 @@ function onDelete(rowId) {
     </article>
 
     <article class="card">
-      <h3 class="section-title">{{ title }} Table</h3>
+      <div class="table-header-row">
+        <h3 class="section-title">{{ title }} Table</h3>
+
+        <label class="field rows-per-page-control">
+          <span class="label-text">Rows per load</span>
+          <select v-model.number="selectedPageSize" class="control" @change="onPageSizeChange">
+            <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
+          </select>
+        </label>
+      </div>
 
       <p v-if="!hasRows" class="muted">No records yet. Add your first entry using the form.</p>
 
-      <div v-else class="table-wrap">
+      <p v-else class="muted table-status">
+        Showing {{ visibleRows.length }} of {{ rows.length }} records.
+      </p>
+
+      <div v-if="hasRows" class="table-wrap">
         <table class="table">
           <thead>
             <tr>
@@ -177,7 +216,7 @@ function onDelete(rowId) {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in rows" :key="row.id">
+            <tr v-for="row in visibleRows" :key="row.id">
               <td v-for="field in fields" :key="field.key">{{ displayValue(row, field) }}</td>
               <td>
                 <div class="row-actions">
@@ -192,6 +231,12 @@ function onDelete(rowId) {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <div v-if="hasRows && hasMoreRows" class="table-footer-actions">
+        <button type="button" class="btn" :disabled="busy" @click="loadNextRows">
+          Load Next {{ selectedPageSize }}
+        </button>
       </div>
     </article>
   </section>
@@ -210,6 +255,31 @@ function onDelete(rowId) {
   gap: 0.6rem 1rem;
   align-items: flex-start;
   margin-bottom: 0.9rem;
+}
+
+.table-header-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.table-header-row .section-title {
+  margin: 0;
+}
+
+.rows-per-page-control {
+  min-width: 140px;
+  margin: 0;
+}
+
+.table-status {
+  margin-top: 0.65rem;
+}
+
+.table-footer-actions {
+  margin-top: 0.75rem;
 }
 
 .panel-header .muted {
