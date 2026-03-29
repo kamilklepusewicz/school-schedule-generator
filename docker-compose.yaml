@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # --- 1. BAZA DANYCH ---
   db:
-    image: postgres:15-alpine
+    image: postgres:latest
     container_name: school_schedule_db
     restart: always
     environment:
@@ -14,6 +14,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      #- ./init.sql:/docker-entrypoint-initdb.d/init.sql
 
   # --- 2. BACKEND (FASTAPI) ---
   api:
