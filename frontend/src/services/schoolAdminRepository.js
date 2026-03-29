@@ -115,6 +115,56 @@ const entityIdPrefixMap = {
   classes: 'C'
 };
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
+
+function buildApiUrl(path) {
+  return `${API_BASE_URL}${path}`;
+}
+
+async function requestJson(path, options = {}) {
+  const response = await fetch(buildApiUrl(path), {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    },
+    ...options
+  });
+
+  if (!response.ok) {
+    let message = `Request failed with status ${response.status}.`;
+
+    try {
+      const details = await response.json();
+      if (details?.detail) {
+        message = typeof details.detail === 'string'
+          ? details.detail
+          : JSON.stringify(details.detail);
+      }
+    } catch {
+      // Keep fallback message when no JSON body is available.
+    }
+
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+function fromApiTeacher(teacher) {
+  return {
+    id: teacher.id,
+    firstName: teacher.first_name,
+    lastName: teacher.last_name
+  };
+}
+
+function toApiTeacher(teacher) {
+  return {
+    first_name: teacher.firstName,
+    last_name: teacher.lastName
+  };
+}
+
 function nextId(prefix) {
   return `${prefix}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 }
@@ -158,11 +208,26 @@ function runWithDelay(payload) {
 
 export async function listEntities(entityName) {
   validateEntityName(entityName);
+
+  if (entityName === 'teachers') {
+    const teachers = await requestJson('/teachers');
+    return teachers.map(fromApiTeacher);
+  }
+
   return runWithDelay(db[entityName]);
 }
 
 export async function createEntity(entityName, payload) {
   validateEntityName(entityName);
+
+  if (entityName === 'teachers') {
+    const createdTeacher = await requestJson('/teachers', {
+      method: 'POST',
+      body: JSON.stringify(toApiTeacher(payload))
+    });
+
+    return fromApiTeacher(createdTeacher);
+  }
 
   const collection = db[entityName];
   const nextPayload = {
@@ -183,6 +248,10 @@ export async function createEntity(entityName, payload) {
 export async function updateEntity(entityName, id, payload) {
   validateEntityName(entityName);
 
+  if (entityName === 'teachers') {
+    throw new Error('Updating teachers is not supported by the backend yet.');
+  }
+
   const collection = db[entityName];
   const index = collection.findIndex((entry) => entry.id === id);
 
@@ -200,6 +269,10 @@ export async function updateEntity(entityName, id, payload) {
 
 export async function deleteEntity(entityName, id) {
   validateEntityName(entityName);
+
+  if (entityName === 'teachers') {
+    throw new Error('Deleting teachers is not supported by the backend yet.');
+  }
 
   const collection = db[entityName];
   const index = collection.findIndex((entry) => entry.id === id);
