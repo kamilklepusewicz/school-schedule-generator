@@ -25,7 +25,10 @@ const entityDefinitions = computed(() => {
     teachers: {
       title: 'Teachers',
       description: 'Manage teaching staff available for classes.',
-      fields: [{ key: 'name', label: 'Name', type: 'text' }]
+      fields: [
+        { key: 'firstName', label: 'First Name', type: 'text' },
+        { key: 'lastName', label: 'Last Name', type: 'text' }
+      ]
     }
   };
 });

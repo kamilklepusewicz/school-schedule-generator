@@ -1,8 +1,8 @@
 const db = {
   teachers: [
-    { id: 'T-001', name: 'Anna Kowalska' },
-    { id: 'T-002', name: 'Piotr Nowak' },
-    { id: 'T-003', name: 'Marta Zielinska' }
+    { id: 'T-001', firstName: 'Anna', lastName: 'Kowalska' },
+    { id: 'T-002', firstName: 'Piotr', lastName: 'Nowak' },
+    { id: 'T-003', firstName: 'Marta', lastName: 'Zielinska' }
   ],
   classGroups: [
     { id: 'G-1A', name: 'Class 1A', no_students: 28 },
@@ -127,6 +127,10 @@ function displayName(entityName, id) {
   const entry = getById(entityName, id);
   if (!entry) {
     return '-';
+  }
+
+  if (entityName === 'teachers') {
+    return `${entry.firstName || ''} ${entry.lastName || ''}`.trim();
   }
 
   if (entityName === 'classRooms') {
