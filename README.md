@@ -17,4 +17,4 @@
 ## Access to different app sections
 
 - Frontend: http://localhost:5173/
-- 
+- Backend: http://localhost:8000/docs
