@@ -115,6 +115,130 @@ const entityIdPrefixMap = {
   classes: 'C'
 };
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+const localTeacherOverrides = new Map();
+const locallyDeletedTeacherIds = new Set();
+const TEACHER_OVERRIDES_STORAGE_KEY = 'schoolAdmin.teacherOverrides';
+const TEACHER_DELETIONS_STORAGE_KEY = 'schoolAdmin.teacherDeletions';
+
+function canUseStorage() {
+  return typeof window !== 'undefined' && Boolean(window.localStorage);
+}
+
+function loadTeacherLocalChanges() {
+  if (!canUseStorage()) {
+    return;
+  }
+
+  try {
+    const storedOverrides = window.localStorage.getItem(TEACHER_OVERRIDES_STORAGE_KEY);
+    const storedDeletions = window.localStorage.getItem(TEACHER_DELETIONS_STORAGE_KEY);
+
+    if (storedOverrides) {
+      const parsedOverrides = JSON.parse(storedOverrides);
+      Object.entries(parsedOverrides).forEach(([id, teacher]) => {
+        localTeacherOverrides.set(id, teacher);
+      });
+    }
+
+    if (storedDeletions) {
+      const parsedDeletions = JSON.parse(storedDeletions);
+      parsedDeletions.forEach((id) => locallyDeletedTeacherIds.add(id));
+    }
+  } catch {
+    localTeacherOverrides.clear();
+    locallyDeletedTeacherIds.clear();
+  }
+}
+
+function persistTeacherLocalChanges() {
+  if (!canUseStorage()) {
+    return;
+  }
+
+  const serializedOverrides = Object.fromEntries(localTeacherOverrides.entries());
+  const serializedDeletions = Array.from(locallyDeletedTeacherIds);
+
+  window.localStorage.setItem(
+    TEACHER_OVERRIDES_STORAGE_KEY,
+    JSON.stringify(serializedOverrides)
+  );
+  window.localStorage.setItem(
+    TEACHER_DELETIONS_STORAGE_KEY,
+    JSON.stringify(serializedDeletions)
+  );
+}
+
+loadTeacherLocalChanges();
+
+function buildApiUrl(path) {
+  return `${API_BASE_URL}${path}`;
+}
+
+async function requestJson(path, options = {}) {
+  let response;
+
+  try {
+    response = await fetch(buildApiUrl(path), {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers || {})
+      },
+      ...options
+    });
+  } catch {
+    throw new Error('Cannot connect to the backend API.');
+  }
+
+  if (!response.ok) {
+    let message = `Request failed with status ${response.status}.`;
+
+    try {
+      const details = await response.json();
+      if (details?.detail) {
+        message = typeof details.detail === 'string'
+          ? details.detail
+          : JSON.stringify(details.detail);
+      }
+    } catch {
+      // Fall back to the generic HTTP status message.
+    }
+
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+function fromApiTeacher(teacher) {
+  return {
+    id: teacher.id,
+    firstName: teacher.first_name,
+    lastName: teacher.last_name
+  };
+}
+
+function toApiTeacher(teacher) {
+  return {
+    first_name: teacher.firstName,
+    last_name: teacher.lastName
+  };
+}
+
+function applyTeacherLocalChanges(teachers) {
+  return teachers
+    .filter((teacher) => !locallyDeletedTeacherIds.has(teacher.id))
+    .map((teacher) => {
+      const override = localTeacherOverrides.get(teacher.id);
+      return override
+        ? {
+          ...teacher,
+          ...override
+        }
+        : teacher;
+    });
+}
+
 function nextId(prefix) {
   return `${prefix}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 }
@@ -158,11 +282,30 @@ function runWithDelay(payload) {
 
 export async function listEntities(entityName) {
   validateEntityName(entityName);
+
+  if (entityName === 'teachers') {
+    const teachers = await requestJson('/teachers');
+    return applyTeacherLocalChanges(teachers.map(fromApiTeacher));
+  }
+
   return runWithDelay(db[entityName]);
 }
 
 export async function createEntity(entityName, payload) {
   validateEntityName(entityName);
+
+  if (entityName === 'teachers') {
+    const teacher = await requestJson('/teachers', {
+      method: 'POST',
+      body: JSON.stringify(toApiTeacher(payload))
+    });
+
+    const normalizedTeacher = fromApiTeacher(teacher);
+    localTeacherOverrides.delete(normalizedTeacher.id);
+    locallyDeletedTeacherIds.delete(normalizedTeacher.id);
+    persistTeacherLocalChanges();
+    return normalizedTeacher;
+  }
 
   const collection = db[entityName];
   const nextPayload = {
@@ -183,6 +326,25 @@ export async function createEntity(entityName, payload) {
 export async function updateEntity(entityName, id, payload) {
   validateEntityName(entityName);
 
+  if (entityName === 'teachers') {
+    const existingTeacher = applyTeacherLocalChanges(await listEntities('teachers'))
+      .find((teacher) => teacher.id === id);
+
+    if (!existingTeacher) {
+      throw new Error(`Entry with id "${id}" not found.`);
+    }
+
+    const nextTeacher = {
+      ...existingTeacher,
+      ...clone(payload)
+    };
+
+    localTeacherOverrides.set(id, nextTeacher);
+    locallyDeletedTeacherIds.delete(id);
+    persistTeacherLocalChanges();
+    return runWithDelay(nextTeacher);
+  }
+
   const collection = db[entityName];
   const index = collection.findIndex((entry) => entry.id === id);
 
@@ -200,6 +362,20 @@ export async function updateEntity(entityName, id, payload) {
 
 export async function deleteEntity(entityName, id) {
   validateEntityName(entityName);
+
+  if (entityName === 'teachers') {
+    const existingTeacher = applyTeacherLocalChanges(await listEntities('teachers'))
+      .find((teacher) => teacher.id === id);
+
+    if (!existingTeacher) {
+      throw new Error(`Entry with id "${id}" not found.`);
+    }
+
+    locallyDeletedTeacherIds.add(id);
+    localTeacherOverrides.delete(id);
+    persistTeacherLocalChanges();
+    return runWithDelay(existingTeacher);
+  }
 
   const collection = db[entityName];
   const index = collection.findIndex((entry) => entry.id === id);
