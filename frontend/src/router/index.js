@@ -1,8 +1,10 @@
+// SECTION: Imports
 import { createRouter, createWebHistory } from 'vue-router';
 import HomeView from '../views/HomeView.vue';
 import AdminDataView from '../views/AdminDataView.vue';
 import StyleGuideView from '../views/StyleGuideView.vue';
 
+// SECTION: Route Definitions
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -24,4 +26,5 @@ const router = createRouter({
   ]
 });
 
+// SECTION: Router Export
 export default router;
