@@ -1,3 +1,4 @@
+// SECTION: Imports
 import { reactive, ref } from 'vue';
 import {
   createEntity,
@@ -11,6 +12,7 @@ import {
   updateEntity
 } from '../services/schoolAdminRepository';
 
+// SECTION: Shared Reactive State
 const state = reactive({
   teachers: [],
   classGroups: [],
@@ -21,12 +23,15 @@ const state = reactive({
   timetableEntries: []
 });
 
+// SECTION: Entity Configuration
 const entityKeys = ['teachers', 'classGroups', 'classRooms', 'subjects', 'classes'];
 
+// SECTION: Request Status Flags
 const isLoading = ref(false);
 const isInitialized = ref(false);
 const lastGenerationRequest = ref(null);
 
+// SECTION: Data Loading Helpers
 async function fetchEntity(entityName) {
   state[entityName] = await listEntities(entityName);
 }
@@ -55,6 +60,7 @@ async function fetchTimetableEntries(groupId) {
   state.timetableEntries = await listTimetableEntries(groupId);
 }
 
+// SECTION: Entity Mutation Operations
 async function addEntity(entityName, payload) {
   isLoading.value = true;
   try {
@@ -68,7 +74,19 @@ async function addEntity(entityName, payload) {
 async function editEntity(entityName, id, payload) {
   isLoading.value = true;
   try {
-    await updateEntity(entityName, id, payload);
+    const updatedEntity = await updateEntity(entityName, id, payload);
+
+    if (entityName === 'teachers') {
+      state.teachers = state.teachers.map((teacher) => (
+        String(teacher.id) === String(id)
+          ? {
+            ...teacher,
+            ...updatedEntity
+          }
+          : teacher
+      ));
+    }
+
     await fetchEntity(entityName);
   } finally {
     isLoading.value = false;
@@ -85,6 +103,7 @@ async function removeEntity(entityName, id) {
   }
 }
 
+// SECTION: Timetable Operations
 async function requestTimetableGeneration(payload) {
   isLoading.value = true;
   try {
@@ -117,6 +136,7 @@ async function swapTimetableEntriesById(groupId, firstId, secondId) {
   }
 }
 
+// SECTION: Public Composable API
 export function useSchoolAdminData() {
   return {
     state,
