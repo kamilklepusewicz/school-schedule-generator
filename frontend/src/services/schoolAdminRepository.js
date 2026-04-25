@@ -216,30 +216,6 @@ async function resolveEntityEndpoint(entityName) {
   throw new Error(`No backend endpoint found for "${entityName}".`);
 }
 
-function applyEntityLocalChanges(entityName, entities) {
-  const deletedIds = locallyDeletedEntityIds.get(entityName);
-  const overrides = localEntityOverrides.get(entityName);
-
-  return entities
-    .filter((entity) => !deletedIds.has(String(entity.id)))
-    .map((entity) => {
-      const override = overrides.get(String(entity.id));
-      return override
-        ? {
-          ...entity,
-          ...override
-        }
-        : entity;
-    });
-}
-
-function clearEntityLocalChanges(entityName, id) {
-  const entityId = String(id);
-  localEntityOverrides.get(entityName).delete(entityId);
-  locallyDeletedEntityIds.get(entityName).delete(entityId);
-  persistEntityLocalChanges();
-}
-
 async function listEntityFromBackend(entityName) {
   const endpoint = await resolveEntityEndpoint(entityName);
   const payload = await requestJson(endpoint);
@@ -262,7 +238,6 @@ async function createEntityInBackend(entityName, payload) {
       });
 
       const normalized = entityApiAdapters[entityName].fromApi(created);
-      clearEntityLocalChanges(entityName, normalized.id);
       return normalized;
     } catch (error) {
       if (error?.status === 422 || error?.status === 400) {
