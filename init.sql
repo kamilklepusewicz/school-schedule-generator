@@ -56,7 +56,7 @@ CREATE TABLE public.lesson (
     start_time timestamp without time zone NOT NULL,
     end_time timestamp without time zone NOT NULL,
     description text,
-    status character varying(20)
+    --status character varying(20)
 );
 
 ALTER TABLE public.lesson OWNER TO postgres;

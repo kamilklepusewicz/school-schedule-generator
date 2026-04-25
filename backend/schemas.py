@@ -61,7 +61,7 @@ class LessonBase(BaseModel):
     start_time: str
     end_time: str
     description: str | None = None
-    status: str
+    ##status: str
 
 class LessonCreate(LessonBase):
     pass

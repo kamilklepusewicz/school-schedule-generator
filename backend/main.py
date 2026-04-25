@@ -97,7 +97,7 @@ def create_lesson(lesson: LessonCreate, db: Session = Depends(get_db)):
         start_time=lesson.start_time,
         end_time=lesson.end_time,
         description=lesson.description,
-        status=lesson.status
+        ##status=lesson.status
     )
     db.add(new_lesson)
     db.commit()
