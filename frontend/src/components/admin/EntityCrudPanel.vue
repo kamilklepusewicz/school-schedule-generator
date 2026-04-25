@@ -28,10 +28,9 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['create', 'update', 'delete']);
+const emit = defineEmits(['create']);
 
 const formState = reactive({});
-const mode = reactive({ type: 'create', id: null });
 const pageSizeOptions = [10, 20, 50];
 const selectedPageSize = ref(pageSizeOptions[0]);
 const displayedCount = ref(pageSizeOptions[0]);
@@ -47,8 +46,6 @@ function resetForm() {
   props.fields.forEach((field) => {
     formState[field.key] = getDefaultValue(field);
   });
-  mode.type = 'create';
-  mode.id = null;
 }
 
 watch(
@@ -107,41 +104,10 @@ function normalizePayload() {
 }
 
 function submitForm() {
-  const payload = normalizePayload();
-
-  if (mode.type === 'edit') {
-    emit('update', {
-      entityName: props.entityName,
-      id: mode.id,
-      payload
-    });
-    return;
-  }
-
   emit('create', {
     entityName: props.entityName,
-    payload
+    payload: normalizePayload()
   });
-}
-
-function loadRowForEdit(row) {
-  props.fields.forEach((field) => {
-    formState[field.key] = row[field.key];
-  });
-
-  mode.type = 'edit';
-  mode.id = row.id;
-}
-
-function onDelete(rowId) {
-  emit('delete', {
-    entityName: props.entityName,
-    id: rowId
-  });
-
-  if (mode.id === rowId) {
-    resetForm();
-  }
 }
 </script>
 
@@ -182,7 +148,7 @@ function onDelete(rowId) {
 
         <div class="actions-row">
           <button type="submit" class="btn btn-primary" :disabled="busy">
-            {{ mode.type === 'edit' ? 'Save Changes' : 'Add Entry' }}
+            Add Entry
           </button>
           <button type="button" class="btn" :disabled="busy" @click="resetForm">Reset</button>
         </div>
@@ -212,22 +178,11 @@ function onDelete(rowId) {
           <thead>
             <tr>
               <th v-for="field in fields" :key="field.key">{{ field.label }}</th>
-              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="row in visibleRows" :key="row.id">
               <td v-for="field in fields" :key="field.key">{{ displayValue(row, field) }}</td>
-              <td>
-                <div class="row-actions">
-                  <button type="button" class="btn" :disabled="busy" @click="loadRowForEdit(row)">
-                    Edit
-                  </button>
-                  <button type="button" class="btn btn-danger" :disabled="busy" @click="onDelete(row.id)">
-                    Delete
-                  </button>
-                </div>
-              </td>
             </tr>
           </tbody>
         </table>
@@ -305,17 +260,6 @@ function onDelete(rowId) {
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem;
-}
-
-.row-actions {
-  display: flex;
-  gap: 0.45rem;
-}
-
-.btn-danger {
-  border-color: var(--color-danger);
-  color: var(--color-danger);
-  background: color-mix(in srgb, var(--color-danger) 8%, white);
 }
 
 @media (max-width: 900px) {

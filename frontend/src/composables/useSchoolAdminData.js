@@ -2,14 +2,12 @@
 import { computed, reactive, ref } from 'vue';
 import {
   createEntity,
-  deleteEntity,
   generateTimetables,
   listEntities,
   listTimetableEntries,
   listTimetableGroups,
   swapTimetableEntries,
   updateTimetableEntry,
-  updateEntity
 } from '../services/schoolAdminRepository';
 
 // SECTION: Shared Reactive State
@@ -71,38 +69,6 @@ async function addEntity(entityName, payload) {
   }
 }
 
-async function editEntity(entityName, id, payload) {
-  isLoading.value = true;
-  try {
-    const updatedEntity = await updateEntity(entityName, id, payload);
-
-    if (entityName === 'teachers') {
-      state.teachers = state.teachers.map((teacher) => (
-        String(teacher.id) === String(id)
-          ? {
-            ...teacher,
-            ...updatedEntity
-          }
-          : teacher
-      ));
-    }
-
-    await fetchEntity(entityName);
-  } finally {
-    isLoading.value = false;
-  }
-}
-
-async function removeEntity(entityName, id) {
-  isLoading.value = true;
-  try {
-    await deleteEntity(entityName, id);
-    await fetchEntity(entityName);
-  } finally {
-    isLoading.value = false;
-  }
-}
-
 // SECTION: Timetable Operations
 async function requestTimetableGeneration(payload) {
   isLoading.value = true;
@@ -157,8 +123,6 @@ export function useSchoolAdminData() {
     fetchTimetableGroups,
     fetchTimetableEntries,
     addEntity,
-    editEntity,
-    removeEntity,
     requestTimetableGeneration,
     moveTimetableEntry,
     swapTimetableEntriesById

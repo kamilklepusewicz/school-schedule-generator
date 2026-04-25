@@ -12,81 +12,12 @@ const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').r
 const backendEntities = ['teachers', 'classGroups', 'classRooms', 'subjects', 'classes'];
 const entityEndpointCandidates = {
   teachers: ['/teachers', '/teacher'],
-  classGroups: ['/class-groups', '/class_groups', '/student-groups', '/student_groups', '/groups'],
-  classRooms: ['/class-rooms', '/class_rooms', '/classrooms', '/classroom', '/rooms'],
+  classGroups: ['/class_groups', '/class-groups', '/student-groups', '/student_groups', '/groups'],
+  classRooms: ['/class_rooms', '/class-rooms', '/classrooms', '/classroom', '/rooms'],
   subjects: ['/subjects', '/subject'],
   classes: ['/classes', '/lesson', '/lessons']
 };
 const resolvedEntityEndpoints = new Map();
-const localEntityOverrides = new Map(
-  backendEntities.map((entityName) => [entityName, new Map()])
-);
-const locallyDeletedEntityIds = new Map(
-  backendEntities.map((entityName) => [entityName, new Set()])
-);
-const ENTITY_LOCAL_CHANGES_STORAGE_KEY = 'schoolAdmin.entityLocalChanges';
-
-// SECTION: Browser Storage Utilities
-function canUseStorage() {
-  return typeof window !== 'undefined' && Boolean(window.localStorage);
-}
-
-function loadEntityLocalChanges() {
-  if (!canUseStorage()) {
-    return;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(ENTITY_LOCAL_CHANGES_STORAGE_KEY);
-    if (!raw) {
-      return;
-    }
-
-    const parsed = JSON.parse(raw);
-
-    backendEntities.forEach((entityName) => {
-      const entityOverrides = parsed?.overrides?.[entityName] || {};
-      const entityDeletions = parsed?.deletions?.[entityName] || [];
-
-      Object.entries(entityOverrides).forEach(([id, entity]) => {
-        localEntityOverrides.get(entityName).set(id, entity);
-      });
-
-      entityDeletions.forEach((id) => {
-        locallyDeletedEntityIds.get(entityName).add(String(id));
-      });
-    });
-  } catch {
-    backendEntities.forEach((entityName) => {
-      localEntityOverrides.get(entityName).clear();
-      locallyDeletedEntityIds.get(entityName).clear();
-    });
-  }
-}
-
-function persistEntityLocalChanges() {
-  if (!canUseStorage()) {
-    return;
-  }
-
-  const serializedOverrides = {};
-  const serializedDeletions = {};
-
-  backendEntities.forEach((entityName) => {
-    serializedOverrides[entityName] = Object.fromEntries(localEntityOverrides.get(entityName).entries());
-    serializedDeletions[entityName] = Array.from(locallyDeletedEntityIds.get(entityName));
-  });
-
-  window.localStorage.setItem(
-    ENTITY_LOCAL_CHANGES_STORAGE_KEY,
-    JSON.stringify({
-      overrides: serializedOverrides,
-      deletions: serializedDeletions
-    })
-  );
-}
-
-loadEntityLocalChanges();
 
 // SECTION: HTTP Request Utilities
 function buildApiUrl(path) {
@@ -134,32 +65,31 @@ async function requestJson(path, options = {}) {
 function fromApiTeacher(teacher) {
   return {
     id: teacher.id,
-    firstName: teacher.first_name,
-    lastName: teacher.last_name
+    first_name: teacher.first_name,
+    last_name: teacher.last_name,
+    subject_id: teacher.subject_id
   };
 }
 
 function toApiTeacher(teacher) {
   return {
-    first_name: teacher.firstName,
-    last_name: teacher.lastName
+    first_name: teacher.first_name,
+    last_name: teacher.last_name,
+    subject_id: Number(teacher.subject_id)
   };
 }
 
 function fromApiClassGroup(group) {
   return {
     id: group.id,
-    name: group.name,
-    no_students: group.no_students ?? group.student_count ?? group.students_count ?? 0
+    name: group.name
   };
 }
 
 function fromApiClassRoom(room) {
   return {
     id: room.id,
-    number: room.number,
-    name: room.name,
-    no_seats: room.no_seats ?? room.seats_count ?? 0
+    name: room.name
   };
 }
 
@@ -175,39 +105,27 @@ function fromApiClass(classEntry) {
     id: classEntry.id,
     subject_id: classEntry.subject_id,
     teacher_id: classEntry.teacher_id,
-    group_id: classEntry.group_id,
-    room_id: classEntry.room_id ?? classEntry.classroom_id,
+    classgroup_id: classEntry.classgroup_id ?? classEntry.group_id,
+    classroom_id: classEntry.classroom_id ?? classEntry.room_id,
     start_date: classEntry.start_date ?? classEntry.start_time,
-    end_date: classEntry.end_date ?? classEntry.end_time
+    end_date: classEntry.end_date ?? classEntry.end_time,
+    description: classEntry.description ?? '',
+    status: classEntry.status ?? ''
   };
 }
 
 function toApiClassGroup(group) {
-  const studentCount = Number(group.no_students);
   return [
     {
-      name: group.name,
-      no_students: studentCount
-    },
-    {
-      name: group.name,
-      student_count: studentCount
+      name: group.name
     }
   ];
 }
 
 function toApiClassRoom(room) {
-  const seatsCount = Number(room.no_seats);
   return [
     {
-      number: room.number,
-      name: room.name,
-      no_seats: seatsCount
-    },
-    {
-      number: room.number,
-      name: room.name,
-      seats_count: seatsCount
+      name: room.name
     }
   ];
 }
@@ -225,26 +143,11 @@ function toApiClass(classEntry) {
     {
       subject_id: Number(classEntry.subject_id),
       teacher_id: Number(classEntry.teacher_id),
-      group_id: Number(classEntry.group_id),
-      room_id: Number(classEntry.room_id),
+      classgroup_id: Number(classEntry.classgroup_id),
+      classroom_id: Number(classEntry.classroom_id),
       start_date: classEntry.start_date,
-      end_date: classEntry.end_date
-    },
-    {
-      subject_id: Number(classEntry.subject_id),
-      teacher_id: Number(classEntry.teacher_id),
-      group_id: Number(classEntry.group_id),
-      classroom_id: Number(classEntry.room_id),
-      start_date: classEntry.start_date,
-      end_date: classEntry.end_date
-    },
-    {
-      subject_id: Number(classEntry.subject_id),
-      teacher_id: Number(classEntry.teacher_id),
-      group_id: Number(classEntry.group_id),
-      classroom_id: Number(classEntry.room_id),
-      start_time: classEntry.start_date,
-      end_time: classEntry.end_date
+      end_date: classEntry.end_date,
+      description: classEntry.description
     }
   ];
 }
@@ -273,10 +176,6 @@ const entityApiAdapters = {
 };
 
 // SECTION: Generic Data Utilities
-function clone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
-
 function normalizeListPayload(payload) {
   if (Array.isArray(payload)) {
     return payload;
@@ -347,7 +246,7 @@ async function listEntityFromBackend(entityName) {
   const items = normalizeListPayload(payload);
   const normalized = items.map(entityApiAdapters[entityName].fromApi);
 
-  return applyEntityLocalChanges(entityName, normalized);
+  return normalized;
 }
 
 async function createEntityInBackend(entityName, payload) {
@@ -382,79 +281,32 @@ async function createEntityInBackend(entityName, payload) {
   throw new Error(`Could not create ${entityName}.`);
 }
 
-async function updateEntityLocally(entityName, id, payload) {
-  const entityId = String(id);
-  const existing = (await listEntityFromBackend(entityName))
-    .find((entity) => String(entity.id) === entityId);
-
-  if (!existing) {
-    throw new Error(`Entry with id "${id}" not found.`);
-  }
-
-  const nextEntity = {
-    ...existing,
-    ...clone(payload)
-  };
-
-  localEntityOverrides.get(entityName).set(entityId, nextEntity);
-  locallyDeletedEntityIds.get(entityName).delete(entityId);
-  persistEntityLocalChanges();
-  return clone(nextEntity);
-}
-
-async function deleteEntityLocally(entityName, id) {
-  const entityId = String(id);
-  const existing = (await listEntityFromBackend(entityName))
-    .find((entity) => String(entity.id) === entityId);
-
-  if (!existing) {
-    throw new Error(`Entry with id "${id}" not found.`);
-  }
-
-  locallyDeletedEntityIds.get(entityName).add(entityId);
-  localEntityOverrides.get(entityName).delete(entityId);
-  persistEntityLocalChanges();
-  return existing;
-}
-
 // SECTION: Entity Handler Registry
 const defaultEntityHandler = {
   list: () => Promise.reject(new Error('No entity handler configured.')),
-  create: () => Promise.reject(new Error('No entity handler configured.')),
-  update: () => Promise.reject(new Error('No entity handler configured.')),
-  remove: () => Promise.reject(new Error('No entity handler configured.'))
+  create: () => Promise.reject(new Error('No entity handler configured.'))
 };
 
 const entityHandlerOverrides = {
   teachers: {
     list: () => listEntityFromBackend('teachers'),
-    create: (_, payload) => createEntityInBackend('teachers', payload),
-    update: (_, id, payload) => updateEntityLocally('teachers', id, payload),
-    remove: (_, id) => deleteEntityLocally('teachers', id)
+    create: (_, payload) => createEntityInBackend('teachers', payload)
   },
   classGroups: {
     list: () => listEntityFromBackend('classGroups'),
-    create: (_, payload) => createEntityInBackend('classGroups', payload),
-    update: (_, id, payload) => updateEntityLocally('classGroups', id, payload),
-    remove: (_, id) => deleteEntityLocally('classGroups', id)
+    create: (_, payload) => createEntityInBackend('classGroups', payload)
   },
   classRooms: {
     list: () => listEntityFromBackend('classRooms'),
-    create: (_, payload) => createEntityInBackend('classRooms', payload),
-    update: (_, id, payload) => updateEntityLocally('classRooms', id, payload),
-    remove: (_, id) => deleteEntityLocally('classRooms', id)
+    create: (_, payload) => createEntityInBackend('classRooms', payload)
   },
   subjects: {
     list: () => listEntityFromBackend('subjects'),
-    create: (_, payload) => createEntityInBackend('subjects', payload),
-    update: (_, id, payload) => updateEntityLocally('subjects', id, payload),
-    remove: (_, id) => deleteEntityLocally('subjects', id)
+    create: (_, payload) => createEntityInBackend('subjects', payload)
   },
   classes: {
     list: () => listEntityFromBackend('classes'),
-    create: (_, payload) => createEntityInBackend('classes', payload),
-    update: (_, id, payload) => updateEntityLocally('classes', id, payload),
-    remove: (_, id) => deleteEntityLocally('classes', id)
+    create: (_, payload) => createEntityInBackend('classes', payload)
   }
 };
 
@@ -479,16 +331,6 @@ export async function listEntities(entityName) {
 export async function createEntity(entityName, payload) {
   const handler = resolveEntityHandler(entityName);
   return handler.create(entityName, payload);
-}
-
-export async function updateEntity(entityName, id, payload) {
-  const handler = resolveEntityHandler(entityName);
-  return handler.update(entityName, id, payload);
-}
-
-export async function deleteEntity(entityName, id) {
-  const handler = resolveEntityHandler(entityName);
-  return handler.remove(entityName, id);
 }
 
 // SECTION: Timetable API Facade

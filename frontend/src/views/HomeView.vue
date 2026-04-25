@@ -12,7 +12,8 @@ onMounted(async () => {
 const recentClasses = computed(() => state.classes.slice(0, 5));
 
 function teacherName(id) {
-  return state.teachers.find((item) => item.id === id)?.name || '-';
+  const teacher = state.teachers.find((item) => item.id === id);
+  return teacher ? `${teacher.first_name} ${teacher.last_name}`.trim() : '-';
 }
 
 function subjectName(id) {
@@ -25,7 +26,7 @@ function groupName(id) {
 
 function roomName(id) {
   const room = state.classRooms.find((item) => item.id === id);
-  return room ? `${room.number} ${room.name}` : '-';
+  return room ? room.name : '-';
 }
 </script>
 
@@ -36,12 +37,12 @@ function roomName(id) {
       description="Manage operational data, then request automatic timetable generation for all class groups."
     />
 
-    <!-- <section class="stats-grid">
+    <section class="stats-grid">
       <article v-for="item in dashboardStats" :key="item.key" class="card stat-card">
         <p class="muted">{{ item.label }}</p>
         <p class="stat-value">{{ item.value }}</p>
       </article>
-    </section> -->
+    </section>
 
     <section class="workspace-grid">
       <article class="card quick-actions">
@@ -65,16 +66,16 @@ function roomName(id) {
               <tr>
                 <th>Subject</th>
                 <th>Teacher</th>
-                <th>Group</th>
-                <th>Room</th>
+                <th>Class Group</th>
+                <th>Class Room</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="entry in recentClasses" :key="entry.id">
                 <td>{{ subjectName(entry.subject_id) }}</td>
                 <td>{{ teacherName(entry.teacher_id) }}</td>
-                <td>{{ groupName(entry.group_id) }}</td>
-                <td>{{ roomName(entry.room_id) }}</td>
+                <td>{{ groupName(entry.classgroup_id) }}</td>
+                <td>{{ roomName(entry.classroom_id) }}</td>
               </tr>
             </tbody>
           </table>
