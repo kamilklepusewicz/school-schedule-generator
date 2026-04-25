@@ -87,7 +87,7 @@ def get_classrooms(db: Session = Depends(get_db)):
     classrooms = db.query(Classroom).all()
     return classrooms
 
-@app.post("/lessons", response_model=LessonResponse, status_code=status.HTTP_201_CREATED)
+@app.post("/classes", response_model=LessonResponse, status_code=status.HTTP_201_CREATED)
 def create_lesson(lesson: LessonCreate, db: Session = Depends(get_db)):
     new_lesson = Lesson(
         subject_id=lesson.subject_id,
@@ -104,7 +104,7 @@ def create_lesson(lesson: LessonCreate, db: Session = Depends(get_db)):
     db.refresh(new_lesson)
     return new_lesson
 
-@app.get("/lessons", response_model=list[LessonResponse])
+@app.get("/classes", response_model=list[LessonResponse])
 def get_lessons(db: Session = Depends(get_db)):
     lessons = db.query(Lesson).all()
     return lessons
