@@ -8,9 +8,7 @@ const {
   state,
   isLoading,
   ensureLoaded,
-  addEntity,
-  editEntity,
-  removeEntity
+  addEntity
 } = useSchoolAdminData();
 
 const activeTab = ref('teachers');
@@ -21,13 +19,62 @@ onMounted(async () => {
 });
 
 const entityDefinitions = computed(() => {
+  const subjectOptions = state.subjects.map((subject) => ({
+    value: subject.id,
+    label: subject.name
+  }));
+
+  const teacherOptions = state.teachers.map((teacher) => ({
+    value: teacher.id,
+    label: `${teacher.first_name} ${teacher.last_name}`
+  }));
+
+  const groupOptions = state.classGroups.map((group) => ({
+    value: group.id,
+    label: group.name
+  }));
+
+  const roomOptions = state.classRooms.map((room) => ({
+    value: room.id,
+    label: room.name
+  }));
+
   return {
     teachers: {
       title: 'Teachers',
-      description: 'Manage teaching staff available for classes.',
+      description: 'Create teaching staff records linked to subjects.',
       fields: [
-        { key: 'firstName', label: 'First Name', type: 'text' },
-        { key: 'lastName', label: 'Last Name', type: 'text' }
+        { key: 'first_name', label: 'First Name', type: 'text' },
+        { key: 'last_name', label: 'Last Name', type: 'text' },
+        { key: 'subject_id', label: 'Subject', type: 'select', options: subjectOptions }
+      ]
+    },
+    classGroups: {
+      title: 'Class Groups',
+      description: 'Create class groups that receive timetables.',
+      fields: [{ key: 'name', label: 'Name', type: 'text' }]
+    },
+    classRooms: {
+      title: 'Class Rooms',
+      description: 'Create rooms used by scheduled classes.',
+      fields: [{ key: 'name', label: 'Name', type: 'text' }]
+    },
+    subjects: {
+      title: 'Subjects',
+      description: 'Create curriculum subjects used in classes.',
+      fields: [{ key: 'name', label: 'Name', type: 'text' }]
+    },
+    classes: {
+      title: 'Classes',
+      description: 'Define class assignments linking groups, teachers, rooms, and dates.',
+      fields: [
+        { key: 'subject_id', label: 'Subject', type: 'select', options: subjectOptions },
+        { key: 'teacher_id', label: 'Teacher', type: 'select', options: teacherOptions },
+        { key: 'classgroup_id', label: 'Class Group', type: 'select', options: groupOptions },
+        { key: 'classroom_id', label: 'Class Room', type: 'select', options: roomOptions },
+        { key: 'start_date', label: 'Start Date', type: 'datetime-local' },
+        { key: 'end_date', label: 'End Date', type: 'datetime-local' },
+        { key: 'description', label: 'Description', type: 'text' }
       ]
     }
   };
@@ -46,35 +93,13 @@ async function handleCreate({ entityName, payload }) {
     feedback.value = error.message;
   }
 }
-
-async function handleUpdate({ entityName, id, payload }) {
-  feedback.value = '';
-
-  try {
-    await editEntity(entityName, id, payload);
-    feedback.value = `${entityDefinitions.value[entityName].title}: entry updated.`;
-  } catch (error) {
-    feedback.value = error.message;
-  }
-}
-
-async function handleDelete({ entityName, id }) {
-  feedback.value = '';
-
-  try {
-    await removeEntity(entityName, id);
-    feedback.value = `${entityDefinitions.value[entityName].title}: entry deleted.`;
-  } catch (error) {
-    feedback.value = error.message;
-  }
-}
 </script>
 
 <template>
   <section class="admin-data-layout">
     <AppPageHeader
       title="Administrator Data Management"
-      description="Manage teachers from one operational workspace."
+      description="Create teachers, groups, rooms, subjects, and classes from one operational workspace."
     />
 
     <article class="card">
@@ -92,7 +117,7 @@ async function handleDelete({ entityName, id }) {
           {{ definition.title }}
         </button>
       </div>
-      <p class="muted tab-hint">Use the tab to view and edit teaching staff.</p>
+      <p class="muted tab-hint">Use the tabs to create and review master data entries.</p>
     </article>
 
     <p v-if="feedback" class="card feedback">{{ feedback }}</p>
@@ -105,8 +130,6 @@ async function handleDelete({ entityName, id }) {
       :rows="currentRows"
       :busy="isLoading"
       @create="handleCreate"
-      @update="handleUpdate"
-      @delete="handleDelete"
     />
   </section>
 </template>
