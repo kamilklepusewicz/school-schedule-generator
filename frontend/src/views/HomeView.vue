@@ -74,7 +74,7 @@ function roomName(id) {
               <tr v-for="entry in recentClasses" :key="entry.id">
                 <td>{{ subjectName(entry.subject_id) }}</td>
                 <td>{{ teacherName(entry.teacher_id) }}</td>
-                <td>{{ groupName(entry.classgroup_id) }}</td>
+                <td>{{ groupName(entry.group_id) }}</td>
                 <td>{{ roomName(entry.classroom_id) }}</td>
               </tr>
             </tbody>

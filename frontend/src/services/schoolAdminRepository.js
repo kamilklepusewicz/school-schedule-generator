@@ -104,13 +104,12 @@ function fromApiClass(classEntry) {
   return {
     id: classEntry.id,
     subject_id: classEntry.subject_id,
-    teacher_id: classEntry.teacher_id,
-    classgroup_id: classEntry.classgroup_id ?? classEntry.group_id,
     classroom_id: classEntry.classroom_id ?? classEntry.room_id,
-    start_date: classEntry.start_date ?? classEntry.start_time,
-    end_date: classEntry.end_date ?? classEntry.end_time,
-    description: classEntry.description ?? '',
-    status: classEntry.status ?? ''
+    teacher_id: classEntry.teacher_id,
+    group_id: classEntry.group_id ?? classEntry.classgroup_id,
+    start_time: classEntry.start_time ?? classEntry.start_date,
+    end_time: classEntry.end_time ?? classEntry.end_date,
+    description: classEntry.description ?? ''
   };
 }
 
@@ -142,11 +141,11 @@ function toApiClass(classEntry) {
   return [
     {
       subject_id: Number(classEntry.subject_id),
-      teacher_id: Number(classEntry.teacher_id),
-      classgroup_id: Number(classEntry.classgroup_id),
       classroom_id: Number(classEntry.classroom_id),
-      start_date: classEntry.start_date,
-      end_date: classEntry.end_date,
+      teacher_id: Number(classEntry.teacher_id),
+      group_id: Number(classEntry.group_id),
+      start_time: classEntry.start_time,
+      end_time: classEntry.end_time,
       description: classEntry.description
     }
   ];
