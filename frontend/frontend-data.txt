@@ -1,0 +1,53 @@
+POST to CREATE entity
+
+GET to FETCH entity
+
+URL: http://localhost:8000/{object}
+
+1. /teachers
+    - POST
+        - first_name: string
+        - last_name: string
+        - subject_id: number
+    - GET
+        - id: number
+        - first_name: string
+        - last_name: string
+        - subject_id: number
+2. /subjects
+    - POST
+        - name: string
+    - GET
+        - id: number
+        - name: string
+3. /class_groups
+    - POST
+        - name: string
+    - GET
+        - id: number
+        - name: string
+4. /class_rooms
+    - POST
+        - name: string
+    - GET
+        - id: number
+        - name: string
+5. /classes
+    - POST
+        - subject_id: number
+        - teacher_id: number
+        - classgroup_id: number
+        - classroom_id: number
+        - start_date: string
+        - end_date: string
+        - description: string
+    - GET
+        - id: number
+        - subject_id: number
+        - teacher_id: number
+        - classgroup_id: number
+        - classroom_id: number
+        - start_date: string
+        - end_date: string
+        - description: string
+        - status: string

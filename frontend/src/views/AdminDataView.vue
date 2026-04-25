@@ -21,6 +21,26 @@ onMounted(async () => {
 });
 
 const entityDefinitions = computed(() => {
+  const subjectOptions = state.subjects.map((subject) => ({
+    value: subject.id,
+    label: subject.name
+  }));
+
+  const teacherOptions = state.teachers.map((teacher) => ({
+    value: teacher.id,
+    label: `${teacher.firstName} ${teacher.lastName}`
+  }));
+
+  const groupOptions = state.classGroups.map((group) => ({
+    value: group.id,
+    label: group.name
+  }));
+
+  const roomOptions = state.classRooms.map((room) => ({
+    value: room.id,
+    label: `${room.number} ${room.name}`
+  }));
+
   return {
     teachers: {
       title: 'Teachers',
@@ -28,6 +48,40 @@ const entityDefinitions = computed(() => {
       fields: [
         { key: 'firstName', label: 'First Name', type: 'text' },
         { key: 'lastName', label: 'Last Name', type: 'text' }
+      ]
+    },
+    classGroups: {
+      title: 'Class Groups',
+      description: 'Manage student groups that receive timetables.',
+      fields: [
+        { key: 'name', label: 'Name', type: 'text' },
+        { key: 'no_students', label: 'No. Students', type: 'number' }
+      ]
+    },
+    classRooms: {
+      title: 'Class Rooms',
+      description: 'Manage available rooms and seating capacity.',
+      fields: [
+        { key: 'number', label: 'Room Number', type: 'text' },
+        { key: 'name', label: 'Room Name', type: 'text' },
+        { key: 'no_seats', label: 'No. Seats', type: 'number' }
+      ]
+    },
+    subjects: {
+      title: 'Subjects',
+      description: 'Manage curriculum subjects used in classes.',
+      fields: [{ key: 'name', label: 'Name', type: 'text' }]
+    },
+    classes: {
+      title: 'Classes',
+      description: 'Define class assignments linking groups, teachers, rooms, and dates.',
+      fields: [
+        { key: 'subject_id', label: 'Subject', type: 'select', options: subjectOptions },
+        { key: 'teacher_id', label: 'Teacher', type: 'select', options: teacherOptions },
+        { key: 'group_id', label: 'Group', type: 'select', options: groupOptions },
+        { key: 'room_id', label: 'Room', type: 'select', options: roomOptions },
+        { key: 'start_date', label: 'Start Date', type: 'datetime-local' },
+        { key: 'end_date', label: 'End Date', type: 'datetime-local' }
       ]
     }
   };
@@ -74,7 +128,7 @@ async function handleDelete({ entityName, id }) {
   <section class="admin-data-layout">
     <AppPageHeader
       title="Administrator Data Management"
-      description="Manage teachers from one operational workspace."
+      description="Manage teachers, groups, rooms, subjects, and classes from one operational workspace."
     />
 
     <article class="card">

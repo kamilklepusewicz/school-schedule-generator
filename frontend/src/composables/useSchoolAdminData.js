@@ -1,5 +1,5 @@
 // SECTION: Imports
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import {
   createEntity,
   deleteEntity,
@@ -136,12 +136,22 @@ async function swapTimetableEntriesById(groupId, firstId, secondId) {
   }
 }
 
+const dashboardStats = computed(() => [
+  { key: 'teachers', label: 'Teachers', value: state.teachers.length },
+  { key: 'classGroups', label: 'Class Groups', value: state.classGroups.length },
+  { key: 'classRooms', label: 'Class Rooms', value: state.classRooms.length },
+  { key: 'subjects', label: 'Subjects', value: state.subjects.length },
+  { key: 'classes', label: 'Classes', value: state.classes.length },
+  { key: 'timetableGroups', label: 'Timetable Groups', value: state.timetableGroups.length }
+]);
+
 // SECTION: Public Composable API
 export function useSchoolAdminData() {
   return {
     state,
     isLoading,
     lastGenerationRequest,
+    dashboardStats,
     ensureLoaded,
     fetchEntity,
     fetchTimetableGroups,
