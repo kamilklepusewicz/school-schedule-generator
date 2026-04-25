@@ -3,8 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from database import engine, Base, get_db
-from models import Teacher
-from schemas import TeacherCreate, TeacherResponse
+from models import *
+from schemas import *
 
 Base.metadata.create_all(bind=engine)
 
@@ -28,7 +28,8 @@ def root():
 def create_teacher(teacher: TeacherCreate, db: Session = Depends(get_db)):
     new_teacher = Teacher(
         first_name=teacher.first_name,
-        last_name=teacher.last_name
+        last_name=teacher.last_name,
+        subject_id=teacher.subject_id
     )
     db.add(new_teacher)
     db.commit()
@@ -40,3 +41,70 @@ def create_teacher(teacher: TeacherCreate, db: Session = Depends(get_db)):
 def get_teachers(db: Session = Depends(get_db)):
     teachers = db.query(Teacher).all()
     return teachers
+
+@app.post("/subjects", response_model=SubjectResponse, status_code=status.HTTP_201_CREATED)
+def create_subject(subject: SubjectCreate, db: Session = Depends(get_db)):
+    new_subject = Subject(
+        name=subject.name
+    )
+    db.add(new_subject)
+    db.commit()
+    db.refresh(new_subject)
+    return new_subject
+
+@app.get("/subjects", response_model=list[SubjectResponse])
+def get_subjects(db: Session = Depends(get_db)):
+    subjects = db.query(Subject).all()
+    return subjects
+
+@app.post("/class_groups", response_model=StudentGroupResponse, status_code=status.HTTP_201_CREATED)
+def create_student_group(group: StudentGroupCreate, db: Session = Depends(get_db)):
+    new_group = StudentGroup(
+        name=group.name
+    )
+    db.add(new_group)
+    db.commit()
+    db.refresh(new_group)
+    return new_group
+
+@app.get("/class_groups", response_model=list[StudentGroupResponse])
+def get_student_groups(db: Session = Depends(get_db)):
+    groups = db.query(StudentGroup).all()
+    return groups
+
+@app.post("/class_rooms", response_model=ClassroomResponse, status_code=status.HTTP_201_CREATED)
+def create_classroom(classroom: ClassroomCreate, db: Session = Depends(get_db)):
+    new_classroom = Classroom(
+        name=classroom.name
+    )
+    db.add(new_classroom)
+    db.commit()
+    db.refresh(new_classroom)
+    return new_classroom
+
+@app.get("/class_rooms", response_model=list[ClassroomResponse])
+def get_classrooms(db: Session = Depends(get_db)):
+    classrooms = db.query(Classroom).all()
+    return classrooms
+
+@app.post("/lessons", response_model=LessonResponse, status_code=status.HTTP_201_CREATED)
+def create_lesson(lesson: LessonCreate, db: Session = Depends(get_db)):
+    new_lesson = Lesson(
+        subject_id=lesson.subject_id,
+        classroom_id=lesson.classroom_id,
+        teacher_id=lesson.teacher_id,
+        group_id=lesson.group_id,
+        start_time=lesson.start_time,
+        end_time=lesson.end_time,
+        description=lesson.description,
+        status=lesson.status
+    )
+    db.add(new_lesson)
+    db.commit()
+    db.refresh(new_lesson)
+    return new_lesson
+
+@app.get("/lessons", response_model=list[LessonResponse])
+def get_lessons(db: Session = Depends(get_db)):
+    lessons = db.query(Lesson).all()
+    return lessons

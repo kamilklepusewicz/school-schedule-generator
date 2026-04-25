@@ -136,7 +136,7 @@ CREATE TABLE public.teacher (
     id integer NOT NULL,
     first_name character varying(100) NOT NULL,
     last_name character varying(100) NOT NULL,
-    teacher_subject integer
+    subject_id integer
 );
 
 ALTER TABLE public.teacher OWNER TO postgres;
@@ -193,4 +193,4 @@ ALTER TABLE ONLY public.lesson
     ADD CONSTRAINT lesson_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES public.teacher(id);
 
 ALTER TABLE ONLY public.teacher
-    ADD CONSTRAINT teacher_subject_fkey FOREIGN KEY (teacher_subject) REFERENCES public.subject(id);
+    ADD CONSTRAINT teacher_subject_id_fkey FOREIGN KEY (subject_id) REFERENCES public.subject(id);
