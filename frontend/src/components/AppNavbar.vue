@@ -13,9 +13,9 @@
       <li>
         <RouterLink to="/admin-data" class="app-link" active-class="is-active">Data Management</RouterLink>
       </li>
-      <li>
+      <!-- <li>
         <RouterLink to="/style-guide" class="app-link" active-class="is-active">Style Guide</RouterLink>
-      </li>
+      </li> -->
     </ul>
   </nav>
 </template>

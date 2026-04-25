@@ -9,7 +9,7 @@ onMounted(async () => {
   await ensureLoaded();
 });
 
-const recentTeachers = computed(() => state.teachers.slice(0, 5));
+const recentTeachers = computed(() => state.teachers.slice(-5).reverse());
 const teachersCount = computed(() => state.teachers.length);
 
 function teacherFullName(entry) {
