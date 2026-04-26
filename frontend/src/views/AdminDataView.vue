@@ -69,11 +69,11 @@ const entityDefinitions = computed(() => {
       description: 'Define class assignments linking groups, teachers, rooms, and dates.',
       fields: [
         { key: 'subject_id', label: 'Subject', type: 'select', options: subjectOptions },
-        { key: 'teacher_id', label: 'Teacher', type: 'select', options: teacherOptions },
-        { key: 'classgroup_id', label: 'Class Group', type: 'select', options: groupOptions },
         { key: 'classroom_id', label: 'Class Room', type: 'select', options: roomOptions },
-        { key: 'start_date', label: 'Start Date', type: 'datetime-local' },
-        { key: 'end_date', label: 'End Date', type: 'datetime-local' },
+        { key: 'teacher_id', label: 'Teacher', type: 'select', options: teacherOptions },
+        { key: 'group_id', label: 'Class Group', type: 'select', options: groupOptions },
+        { key: 'start_time', label: 'Start Time', type: 'datetime-local' },
+        { key: 'end_time', label: 'End Time', type: 'datetime-local' },
         { key: 'description', label: 'Description', type: 'text' }
       ]
     }
