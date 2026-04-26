@@ -1,4 +1,5 @@
 from pydantic import BaseModel, ConfigDict
+from datetime import datetime
 ## Teacher Schemas
 class TeacherBase(BaseModel):
     first_name: str
@@ -58,8 +59,8 @@ class LessonBase(BaseModel):
     classroom_id: int
     teacher_id: int
     group_id: int
-    start_time: str
-    end_time: str
+    start_time: datetime
+    end_time: datetime
     description: str | None = None
     ##status: str
 

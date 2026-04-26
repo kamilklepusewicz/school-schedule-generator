@@ -34,7 +34,7 @@ class Lesson(Base):
     subject_id = Column(Integer, ForeignKey("subject.id"), nullable=False)
     classroom_id = Column(Integer, ForeignKey("classroom.id"), nullable=False)
     teacher_id = Column(Integer, ForeignKey("teacher.id"), nullable=False)
-    group_id = Column(Integer, ForeignKey("group.id"), nullable=False)
+    group_id = Column(Integer, ForeignKey("student_group.id"), nullable=False)
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)
     description = Column(String, nullable=True)
