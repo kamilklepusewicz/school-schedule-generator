@@ -26,8 +26,8 @@ export const db = {
       teacher_id: 'T-001',
       group_id: 'G-1A',
       room_id: 'R-101',
-      start_date: '2026-03-23T08:00',
-      end_date: '2026-03-23T08:45'
+      start_time: '2026-03-23T08:00',
+      end_time: '2026-03-23T08:45'
     },
     {
       id: 'C-0002',
@@ -35,8 +35,8 @@ export const db = {
       teacher_id: 'T-002',
       group_id: 'G-1A',
       room_id: 'R-204',
-      start_date: '2026-03-23T09:00',
-      end_date: '2026-03-23T09:45'
+      start_time: '2026-03-23T09:00',
+      end_time: '2026-03-23T09:45'
     },
     {
       id: 'C-0003',
@@ -44,8 +44,8 @@ export const db = {
       teacher_id: 'T-003',
       group_id: 'G-1B',
       room_id: 'R-302',
-      start_date: '2026-03-23T10:00',
-      end_date: '2026-03-23T10:45'
+      start_time: '2026-03-23T10:00',
+      end_time: '2026-03-23T10:45'
     },
     {
       id: 'C-0004',
@@ -53,8 +53,8 @@ export const db = {
       teacher_id: 'T-001',
       group_id: 'G-1B',
       room_id: 'R-101',
-      start_date: '2026-03-24T08:00',
-      end_date: '2026-03-24T08:45'
+      start_time: '2026-03-24T08:00',
+      end_time: '2026-03-24T08:45'
     }
   ],
   timetableGroups: [
