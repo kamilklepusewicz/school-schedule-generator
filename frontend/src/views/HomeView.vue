@@ -3,17 +3,30 @@ import { computed, onMounted } from 'vue';
 import AppPageHeader from '../components/AppPageHeader.vue';
 import { useSchoolAdminData } from '../composables/useSchoolAdminData';
 
-const { state, ensureLoaded } = useSchoolAdminData();
+const { state, dashboardStats, ensureLoaded } = useSchoolAdminData();
 
 onMounted(async () => {
   await ensureLoaded();
 });
 
-const recentTeachers = computed(() => state.teachers.slice(-5).reverse());
-const teachersCount = computed(() => state.teachers.length);
+const recentClasses = computed(() => state.classes.slice(0, 5));
 
-function teacherFullName(entry) {
-  return `${entry.firstName} ${entry.lastName}`.trim();
+function teacherName(id) {
+  const teacher = state.teachers.find((item) => item.id === id);
+  return teacher ? `${teacher.first_name} ${teacher.last_name}`.trim() : '-';
+}
+
+function subjectName(id) {
+  return state.subjects.find((item) => item.id === id)?.name || '-';
+}
+
+function groupName(id) {
+  return state.classGroups.find((item) => item.id === id)?.name || '-';
+}
+
+function roomName(id) {
+  const room = state.classRooms.find((item) => item.id === id);
+  return room ? room.name : '-';
 }
 </script>
 
@@ -24,28 +37,45 @@ function teacherFullName(entry) {
       description="Manage operational data, then request automatic timetable generation for all class groups."
     />
 
+    <section class="stats-grid">
+      <article v-for="item in dashboardStats" :key="item.key" class="card stat-card">
+        <p class="muted">{{ item.label }}</p>
+        <p class="stat-value">{{ item.value }}</p>
+      </article>
+    </section>
+
     <section class="workspace-grid">
-      <article class="card teacher-count-tile">
-        <p class="muted">Teachers</p>
-        <p class="teacher-count-tile__value">{{ teachersCount }}</p>
+      <article class="card quick-actions">
+        <h2 class="section-title">Quick Actions</h2>
+        <p class="muted">Jump directly to the three core administrator workflows.</p>
+
+        <div class="quick-actions__buttons">
+          <RouterLink to="/admin-data" class="btn btn-primary">Manage Master Data</RouterLink>
+          <RouterLink to="/timetable-generation" class="btn">Generate Timetables</RouterLink>
+          <RouterLink to="/timetable-management" class="btn">Manage Generated Timetables</RouterLink>
+        </div>
       </article>
 
       <article class="card">
-        <h2 class="section-title">Recently Added Teachers</h2>
-        <p v-if="!recentTeachers.length" class="muted">
-          No teachers defined yet. Start in Data Management.
-        </p>
+        <h2 class="section-title">Recently Added Classes</h2>
+        <p v-if="!recentClasses.length" class="muted">No classes defined yet. Start in Data Management.</p>
 
         <div v-else class="table-wrap">
           <table class="table">
             <thead>
               <tr>
-                <th>Name</th>
+                <th>Subject</th>
+                <th>Teacher</th>
+                <th>Class Group</th>
+                <th>Class Room</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="entry in recentTeachers" :key="entry.id">
-                <td>{{ teacherFullName(entry) }}</td>
+              <tr v-for="entry in recentClasses" :key="entry.id">
+                <td>{{ subjectName(entry.subject_id) }}</td>
+                <td>{{ teacherName(entry.teacher_id) }}</td>
+                <td>{{ groupName(entry.group_id) }}</td>
+                <td>{{ roomName(entry.classroom_id) }}</td>
               </tr>
             </tbody>
           </table>
@@ -61,9 +91,24 @@ function teacherFullName(entry) {
   gap: 1rem;
 }
 
-.teacher-count-tile__value {
+.stats-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.stat-card {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.stat-card .muted {
   margin: 0;
-  font-size: 2.2rem;
+}
+
+.stat-value {
+  margin: 0;
+  font-size: 1.65rem;
   font-weight: 700;
   color: var(--color-accent-strong);
 }
@@ -74,12 +119,23 @@ function teacherFullName(entry) {
   gap: 1rem;
 }
 
-.teacher-count-tile {
+.quick-actions {
   height: fit-content;
 }
 
+.quick-actions__buttons {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+
 @media (max-width: 900px) {
-  .workspace-grid {
+  .stats-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .workspace-grid,
+  .quick-actions__buttons {
     grid-template-columns: 1fr;
   }
 }
