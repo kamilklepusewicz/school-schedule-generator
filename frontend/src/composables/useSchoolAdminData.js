@@ -29,6 +29,16 @@ const isLoading = ref(false);
 const isInitialized = ref(false);
 const lastGenerationRequest = ref(null);
 
+// SECTION: Utility Helper for Loading State Management
+async function withLoading(asyncFn) {
+  isLoading.value = true;
+  try {
+    return await asyncFn();
+  } finally {
+    isLoading.value = false;
+  }
+}
+
 // SECTION: Data Loading Helpers
 async function fetchEntity(entityName) {
   state[entityName] = await listEntities(entityName);
@@ -39,15 +49,11 @@ async function ensureLoaded() {
     return;
   }
 
-  isLoading.value = true;
-
-  try {
+  await withLoading(async () => {
     await Promise.all(entityKeys.map((entityName) => fetchEntity(entityName)));
     state.timetableGroups = await listTimetableGroups();
     isInitialized.value = true;
-  } finally {
-    isLoading.value = false;
-  }
+  });
 }
 
 async function fetchTimetableGroups() {
@@ -60,46 +66,34 @@ async function fetchTimetableEntries(groupId) {
 
 // SECTION: Entity Mutation Operations
 async function addEntity(entityName, payload) {
-  isLoading.value = true;
-  try {
+  await withLoading(async () => {
     await createEntity(entityName, payload);
     await fetchEntity(entityName);
-  } finally {
-    isLoading.value = false;
-  }
+  });
 }
 
 // SECTION: Timetable Operations
 async function requestTimetableGeneration(payload) {
-  isLoading.value = true;
-  try {
+  return await withLoading(async () => {
     const response = await generateTimetables(payload);
     await fetchTimetableGroups();
     lastGenerationRequest.value = response;
     return response;
-  } finally {
-    isLoading.value = false;
-  }
+  });
 }
 
 async function moveTimetableEntry(groupId, entryId, payload) {
-  isLoading.value = true;
-  try {
+  await withLoading(async () => {
     await updateTimetableEntry(groupId, entryId, payload);
     await fetchTimetableEntries(groupId);
-  } finally {
-    isLoading.value = false;
-  }
+  });
 }
 
 async function swapTimetableEntriesById(groupId, firstId, secondId) {
-  isLoading.value = true;
-  try {
+  await withLoading(async () => {
     await swapTimetableEntries(groupId, firstId, secondId);
     await fetchTimetableEntries(groupId);
-  } finally {
-    isLoading.value = false;
-  }
+  });
 }
 
 const dashboardStats = computed(() => [

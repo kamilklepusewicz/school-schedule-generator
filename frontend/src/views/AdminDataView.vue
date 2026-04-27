@@ -18,26 +18,22 @@ onMounted(async () => {
   await ensureLoaded();
 });
 
+// Helper to map entities to dropdown options
+function buildOptions(entities, { valueKey = 'id', labelKey = 'name', labelFn = null } = {}) {
+  return entities.map((entity) => ({
+    value: entity[valueKey],
+    label: labelFn ? labelFn(entity) : entity[labelKey]
+  }));
+}
+
 const entityDefinitions = computed(() => {
-  const subjectOptions = state.subjects.map((subject) => ({
-    value: subject.id,
-    label: subject.name
-  }));
-
-  const teacherOptions = state.teachers.map((teacher) => ({
-    value: teacher.id,
-    label: `${teacher.first_name} ${teacher.last_name}`
-  }));
-
-  const groupOptions = state.classGroups.map((group) => ({
-    value: group.id,
-    label: group.name
-  }));
-
-  const roomOptions = state.classRooms.map((room) => ({
-    value: room.id,
-    label: room.name
-  }));
+  const subjectOptions = buildOptions(state.subjects);
+  const teacherOptions = buildOptions(state.teachers, {
+    valueKey: 'id',
+    labelFn: (t) => `${t.first_name} ${t.last_name}`
+  });
+  const groupOptions = buildOptions(state.classGroups);
+  const roomOptions = buildOptions(state.classRooms);
 
   return {
     teachers: {
