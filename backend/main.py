@@ -45,7 +45,8 @@ def get_teachers(db: Session = Depends(get_db)):
 @app.post("/subjects", response_model=SubjectResponse, status_code=status.HTTP_201_CREATED)
 def create_subject(subject: SubjectCreate, db: Session = Depends(get_db)):
     new_subject = Subject(
-        name=subject.name
+        name=subject.name,
+        classroom_type_id=subject.classroom_type_id
     )
     db.add(new_subject)
     db.commit()
@@ -75,7 +76,8 @@ def get_student_groups(db: Session = Depends(get_db)):
 @app.post("/class_rooms", response_model=ClassroomResponse, status_code=status.HTTP_201_CREATED)
 def create_classroom(classroom: ClassroomCreate, db: Session = Depends(get_db)):
     new_classroom = Classroom(
-        name=classroom.name
+        name=classroom.name,
+        classroom_type_id=classroom.classroom_type_id
     )
     db.add(new_classroom)
     db.commit()
@@ -94,10 +96,8 @@ def create_lesson(lesson: LessonCreate, db: Session = Depends(get_db)):
         classroom_id=lesson.classroom_id,
         teacher_id=lesson.teacher_id,
         group_id=lesson.group_id,
-        start_time=lesson.start_time,
-        end_time=lesson.end_time,
-        description=lesson.description,
-        ##status=lesson.status
+        slot=lesson.slot,
+        day=lesson.day
     )
     db.add(new_lesson)
     db.commit()
@@ -108,3 +108,35 @@ def create_lesson(lesson: LessonCreate, db: Session = Depends(get_db)):
 def get_lessons(db: Session = Depends(get_db)):
     lessons = db.query(Lesson).all()
     return lessons
+
+@app.post("/classroom_types", response_model=ClassroomTypeResponse, status_code=status.HTTP_201_CREATED)
+def create_classroom_type(classroom_type: ClassroomTypeCreate, db: Session = Depends(get_db)):
+    new_classroom_type = ClassroomType(
+        name=classroom_type.name
+    )
+    db.add(new_classroom_type)
+    db.commit()
+    db.refresh(new_classroom_type)
+    return new_classroom_type
+
+@app.get("/classroom_types", response_model=list[ClassroomTypeResponse])
+def get_classroom_types(db: Session = Depends(get_db)):
+    classroom_types = db.query(ClassroomType).all()
+    return classroom_types
+
+@app.post("/lesson_counts", response_model=list[LessonCountResponse], status_code=status.HTTP_201_CREATED)
+def create_lesson_count(lesson_count: LessonCountCreate, db: Session = Depends(get_db)):
+    new_lesson_count = LessonCount(
+        student_group_id = lesson_count.student_group_id,
+        subject_id = lesson_count.subject_id,
+        hours = lesson_count.hours
+    )
+    db.add(new_lesson_count)
+    db.commit()
+    db.refresh(new_lesson_count)
+    return new_lesson_count
+
+@app.get("/lesson_counts", response_model=list[LessonCountResponse])
+def get_lesson_count(db: Session = Depends(get_db)):
+    lesson_counts = db.query(LessonCount).all()
+    return lesson_counts
