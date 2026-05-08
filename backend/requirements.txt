@@ -4,3 +4,4 @@ pydantic
 sqlalchemy
 python-dotenv
 psycopg2-binary  # Sterownik do połączenia Pythona z PostgreSQL
+faker
