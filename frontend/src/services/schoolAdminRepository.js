@@ -13,10 +13,12 @@ const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').r
 // Entity-to-endpoint mapping (matches backend routes)
 const entityEndpoints = {
   teachers: '/teachers',
-  classGroups: '/class_groups',
-  classRooms: '/class_rooms',
+  student_group: '/class_groups',
+  classroom: '/class_rooms',
   subjects: '/subjects',
-  classes: '/classes'
+  classes: '/classes',
+  classroom_type: '/classroom_types',
+  lesson_count: '/lesson_counts'
 };
 
 // SECTION: HTTP Request Utilities
@@ -69,17 +71,19 @@ const responseNormalizers = {
     last_name: data.last_name,
     subject_id: data.subject_id
   }),
-  classGroups: (data) => ({
+  student_group: (data) => ({
     id: data.id,
     name: data.name
   }),
-  classRooms: (data) => ({
+  classroom: (data) => ({
     id: data.id,
-    name: data.name
+    name: data.name,
+    classroom_type_id: data.classroom_type_id
   }),
   subjects: (data) => ({
     id: data.id,
-    name: data.name
+    name: data.name,
+    classroom_type_id: data.classroom_type_id
   }),
   classes: (data) => ({
     id: data.id,
@@ -87,9 +91,19 @@ const responseNormalizers = {
     classroom_id: data.classroom_id ?? data.room_id,
     teacher_id: data.teacher_id,
     group_id: data.group_id ?? data.classgroup_id,
-    start_time: data.start_time ?? data.start_date,
-    end_time: data.end_time ?? data.end_date,
+    day: data.day,
+    start: data.start,
     description: data.description ?? ''
+  }),
+  classroom_type: (data) => ({
+    id: data.id,
+    name: data.name
+  }),
+  lesson_count: (data) => ({
+    id: data.id,
+    student_group_id: data.student_group_id,
+    subject_id: data.subject_id,
+    hours: data.hours
   })
 };
 
@@ -151,6 +165,55 @@ async function createEntityInBackend(entityName, payload) {
   return normalizer ? normalizer(response) : response;
 }
 
+async function updateEntityInBackend(entityName, entityId, payload) {
+  const endpoint = entityEndpoints[entityName];
+  if (!endpoint) {
+    throw new Error(`Unknown entity: ${entityName}`);
+  }
+
+  // Normalize payload to ensure correct types
+  const normalizedPayload = {
+    ...payload,
+    subject_id: payload.subject_id ? Number(payload.subject_id) : undefined,
+    classroom_id: payload.classroom_id ? Number(payload.classroom_id) : undefined,
+    teacher_id: payload.teacher_id ? Number(payload.teacher_id) : undefined,
+    group_id: payload.group_id ? Number(payload.group_id) : undefined,
+    classroom_type_id: payload.classroom_type_id ? Number(payload.classroom_type_id) : undefined,
+    student_group_id: payload.student_group_id ? Number(payload.student_group_id) : undefined,
+    hours: payload.hours ? Number(payload.hours) : undefined,
+    day: payload.day ? Number(payload.day) : undefined,
+    start: payload.start ? Number(payload.start) : undefined
+  };
+
+  // Remove undefined fields
+  Object.keys(normalizedPayload).forEach((key) => {
+    if (normalizedPayload[key] === undefined) {
+      delete normalizedPayload[key];
+    }
+  });
+
+  const response = await requestJson(`${endpoint}/${entityId}`, {
+    method: 'PUT',
+    body: JSON.stringify(normalizedPayload)
+  });
+
+  const normalizer = responseNormalizers[entityName];
+  return normalizer ? normalizer(response) : response;
+}
+
+async function deleteEntityInBackend(entityName, entityId) {
+  const endpoint = entityEndpoints[entityName];
+  if (!endpoint) {
+    throw new Error(`Unknown entity: ${entityName}`);
+  }
+
+  await requestJson(`${endpoint}/${entityId}`, {
+    method: 'DELETE'
+  });
+
+  return { id: entityId };
+}
+
 // SECTION: Entity API Facade (direct exports)
 export async function listEntities(entityName) {
   return listEntityFromBackend(entityName);
@@ -158,6 +221,14 @@ export async function listEntities(entityName) {
 
 export async function createEntity(entityName, payload) {
   return createEntityInBackend(entityName, payload);
+}
+
+export async function updateEntity(entityName, entityId, payload) {
+  return updateEntityInBackend(entityName, entityId, payload);
+}
+
+export async function deleteEntity(entityName, entityId) {
+  return deleteEntityInBackend(entityName, entityId);
 }
 
 // SECTION: Timetable API Facade

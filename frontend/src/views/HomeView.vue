@@ -21,11 +21,11 @@ function subjectName(id) {
 }
 
 function groupName(id) {
-  return state.classGroups.find((item) => item.id === id)?.name || '-';
+  return state.student_group.find((item) => item.id === id)?.name || '-';
 }
 
 function roomName(id) {
-  const room = state.classRooms.find((item) => item.id === id);
+  const room = state.classroom.find((item) => item.id === id);
   return room ? room.name : '-';
 }
 </script>
@@ -94,7 +94,7 @@ function roomName(id) {
 .stats-grid {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .stat-card {
