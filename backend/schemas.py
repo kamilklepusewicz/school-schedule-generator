@@ -30,6 +30,7 @@ class StudentGroupResponse(StudentGroupBase):
 # Subject Schemas
 class SubjectBase(BaseModel):
     name: str
+    classroom_type_id: int
 
 class SubjectCreate(SubjectBase):
     pass
@@ -43,11 +44,24 @@ class SubjectResponse(SubjectBase):
 # Classroom Schemas
 class ClassroomBase(BaseModel):
     name: str
+    classroom_type_id: int
 
 class ClassroomCreate(ClassroomBase):
     pass
 
 class ClassroomResponse(ClassroomBase):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ClassroomTypeBase(BaseModel):
+    name: str
+
+class ClassroomTypeCreate(ClassroomTypeBase):
+    pass
+
+class ClassroomTypeResponse(ClassroomTypeBase):
     id: int
 
     model_config = ConfigDict(from_attributes=True)
@@ -59,15 +73,26 @@ class LessonBase(BaseModel):
     classroom_id: int
     teacher_id: int
     group_id: int
-    start_time: datetime
-    end_time: datetime
-    description: str | None = None
-    ##status: str
+    slot: int
+    day: int
 
 class LessonCreate(LessonBase):
     pass
 
 class LessonResponse(LessonBase):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+class LessonCountBase(BaseModel):
+    student_group_id: int
+    subject_id: int
+    hours: int
+
+class LessonCountCreate(LessonCountBase):
+    pass
+
+class LessonCountResponse(LessonCountBase):
     id: int
 
     model_config = ConfigDict(from_attributes=True)
