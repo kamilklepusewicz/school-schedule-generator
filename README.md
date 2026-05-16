@@ -17,4 +17,5 @@
 ## Access to different app sections
 
 - Frontend: http://localhost:5173/
+- Guided setup: http://localhost:5173/admin-data-wizard
 - Backend: http://localhost:8000/docs

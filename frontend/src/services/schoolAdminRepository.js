@@ -60,6 +60,11 @@ async function requestJson(path, options = {}) {
     throw error;
   }
 
+  // Handle 204 No Content responses (common for DELETE requests)
+  if (response.status === 204) {
+    return {};
+  }
+
   return response.json();
 }
 
@@ -92,8 +97,7 @@ const responseNormalizers = {
     teacher_id: data.teacher_id,
     group_id: data.group_id ?? data.classgroup_id,
     day: data.day,
-    start: data.start,
-    description: data.description ?? ''
+    start: data.slot
   }),
   classroom_type: (data) => ({
     id: data.id,
@@ -140,14 +144,23 @@ async function createEntityInBackend(entityName, payload) {
     throw new Error(`Unknown entity: ${entityName}`);
   }
 
-  // Normalize payload to ensure correct types
-  const normalizedPayload = {
+  // Normalize payload to ensure correct types and field mappings
+  let normalizedPayload = {
     ...payload,
     subject_id: payload.subject_id ? Number(payload.subject_id) : undefined,
     classroom_id: payload.classroom_id ? Number(payload.classroom_id) : undefined,
     teacher_id: payload.teacher_id ? Number(payload.teacher_id) : undefined,
     group_id: payload.group_id ? Number(payload.group_id) : undefined
   };
+
+  // Map frontend field names to backend field names
+  if (entityName === 'classes') {
+    if (normalizedPayload.start !== undefined) {
+      normalizedPayload.slot = normalizedPayload.start;
+      delete normalizedPayload.start;
+    }
+    delete normalizedPayload.description;
+  }
 
   // Remove undefined fields
   Object.keys(normalizedPayload).forEach((key) => {
@@ -172,7 +185,7 @@ async function updateEntityInBackend(entityName, entityId, payload) {
   }
 
   // Normalize payload to ensure correct types
-  const normalizedPayload = {
+  let normalizedPayload = {
     ...payload,
     subject_id: payload.subject_id ? Number(payload.subject_id) : undefined,
     classroom_id: payload.classroom_id ? Number(payload.classroom_id) : undefined,
@@ -184,6 +197,15 @@ async function updateEntityInBackend(entityName, entityId, payload) {
     day: payload.day ? Number(payload.day) : undefined,
     start: payload.start ? Number(payload.start) : undefined
   };
+
+  // Map frontend field names to backend field names
+  if (entityName === 'classes') {
+    if (normalizedPayload.start !== undefined) {
+      normalizedPayload.slot = normalizedPayload.start;
+      delete normalizedPayload.start;
+    }
+    delete normalizedPayload.description;
+  }
 
   // Remove undefined fields
   Object.keys(normalizedPayload).forEach((key) => {

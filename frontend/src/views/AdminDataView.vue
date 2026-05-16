@@ -116,8 +116,7 @@ const entityDefinitions = computed(() => {
         { key: 'teacher_id', label: 'Teacher', type: 'select', options: teacherOptions },
         { key: 'group_id', label: 'Student Group', type: 'select', options: studentGroupOptions },
         { key: 'day', label: 'Day of Week', type: 'select', options: dayOptions },
-        { key: 'start', label: 'Start Hour', type: 'select', options: hourOptions },
-        { key: 'description', label: 'Description', type: 'text' }
+        { key: 'start', label: 'Start Hour', type: 'select', options: hourOptions }
       ],
       missingMessage: 'Cannot create classes. Ensure you have subjects, classrooms, teachers, and student groups.'
     },

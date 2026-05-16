@@ -144,12 +144,10 @@ function cancelEdit() {
 }
 
 function deleteRow(rowId) {
-  if (confirm('Are you sure you want to delete this entry?')) {
-    emit('delete', {
-      entityName: props.entityName,
-      entityId: rowId
-    });
-  }
+  emit('delete', {
+    entityName: props.entityName,
+    entityId: rowId
+  });
 }
 </script>
 
