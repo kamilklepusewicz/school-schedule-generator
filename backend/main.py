@@ -293,16 +293,23 @@ def delete_classroom_type(type_id: int, db: Session = Depends(get_db)):
 
 # ENDPOINTY LICZBY GODZIN PRZEDMIOTU DLA GRUPY
 @app.post("/lesson_counts", response_model=list[LessonCountResponse], status_code=status.HTTP_201_CREATED)
-def create_lesson_count(lesson_count: LessonCountCreate, db: Session = Depends(get_db)):
-    new_lesson_count = LessonCount(
-        student_group_id = lesson_count.student_group_id,
-        subject_id = lesson_count.subject_id,
-        hours = lesson_count.hours
-    )
-    db.add(new_lesson_count)
+def create_lesson_count(lesson_counts: list[LessonCountCreate], db: Session = Depends(get_db)):
+    new_lesson_counts = []
+    for lesson_count in lesson_counts:
+        new_lesson_count = LessonCount(
+            student_group_id = lesson_count.student_group_id,
+            subject_id = lesson_count.subject_id,
+            hours = lesson_count.hours
+        )
+        new_lesson_counts.append(new_lesson_count)
+
+    db.add_all(new_lesson_counts)
     db.commit()
-    db.refresh(new_lesson_count)
-    return new_lesson_count
+    
+    for lesson_count in new_lesson_counts:
+        db.refresh(lesson_count)
+
+    return new_lesson_counts
 
 
 @app.get("/lesson_counts", response_model=list[LessonCountResponse])
