@@ -57,18 +57,21 @@ const selectedGroup = computed(
   () => state.timetableGroups.find((item) => item.id === selectedGroupId.value) || null
 );
 
+const perspectiveKeyMap = computed(() => ({
+  groups: 'group_name',
+  rooms: 'room_name',
+  teachers: 'teacher_name'
+}));
+
+const currentPerspectiveKey = computed(
+  () => perspectiveKeyMap.value[perspective.value] || 'group_name'
+);
+
 const scopeOptions = computed(() => {
   const unique = new Map();
-  const keyName = perspective.value === 'groups'
-    ? 'group_name'
-    : perspective.value === 'rooms'
-      ? 'room_name'
-      : 'teacher_name';
-
   state.timetableEntries.forEach((entry) => {
-    unique.set(entry[keyName], entry[keyName]);
+    unique.set(entry[currentPerspectiveKey.value], entry[currentPerspectiveKey.value]);
   });
-
   return Array.from(unique.values());
 });
 
@@ -76,14 +79,9 @@ const visibleEntries = computed(() => {
   if (!selectedScope.value) {
     return state.timetableEntries;
   }
-
-  const keyName = perspective.value === 'groups'
-    ? 'group_name'
-    : perspective.value === 'rooms'
-      ? 'room_name'
-      : 'teacher_name';
-
-  return state.timetableEntries.filter((entry) => entry[keyName] === selectedScope.value);
+  return state.timetableEntries.filter(
+    (entry) => entry[currentPerspectiveKey.value] === selectedScope.value
+  );
 });
 
 const entryOptions = computed(() =>
@@ -94,24 +92,14 @@ const entryOptions = computed(() =>
 );
 
 const entriesByScope = computed(() => {
-  const keyName = perspective.value === 'groups'
-    ? 'group_name'
-    : perspective.value === 'rooms'
-      ? 'room_name'
-      : 'teacher_name';
-
   const map = new Map();
-
   visibleEntries.value.forEach((entry) => {
-    const scopeName = entry[keyName];
-
+    const scopeName = entry[currentPerspectiveKey.value];
     if (!map.has(scopeName)) {
       map.set(scopeName, []);
     }
-
     map.get(scopeName).push(entry);
   });
-
   return Array.from(map.entries()).map(([scope, entries]) => ({ scope, entries }));
 });
 

@@ -6,8 +6,6 @@ import { useSchoolAdminData } from '../composables/useSchoolAdminData';
 const { state, ensureLoaded, requestTimetableGeneration, lastGenerationRequest } = useSchoolAdminData();
 
 const requestForm = reactive({
-  period_start: '',
-  period_end: '',
   target_group_id: ''
 });
 
@@ -17,18 +15,16 @@ onMounted(async () => {
   await ensureLoaded();
 });
 
-const groupOptions = computed(() => state.classGroups);
+const groupOptions = computed(() => state.student_group);
 
 async function onGenerate() {
   requestStatus.value = '';
 
   try {
     await requestTimetableGeneration({
-      period_start: requestForm.period_start,
-      period_end: requestForm.period_end,
       target_group_id: requestForm.target_group_id || 'all'
     });
-    requestStatus.value = 'Generation request queued successfully. The backend will process timetable creation.';
+    requestStatus.value = 'Generation request queued successfully. The backend will process timetable creation based on lesson hours per subject per group.';
   } catch (error) {
     requestStatus.value = error.message;
   }
@@ -47,20 +43,14 @@ async function onGenerate() {
         <h2 class="section-title">Create Generation Request</h2>
 
         <form class="generation-form" @submit.prevent="onGenerate">
-          <label class="field">
-            <span class="label-text">Period Start</span>
-            <input v-model="requestForm.period_start" class="control" type="date" required />
-          </label>
-
-          <label class="field">
-            <span class="label-text">Period End</span>
-            <input v-model="requestForm.period_end" class="control" type="date" required />
-          </label>
+          <p class="form-info">
+            Timetable generation will create a schedule based on the lesson hours configured for each subject per student group.
+          </p>
 
           <label class="field full-width">
-            <span class="label-text">Group Scope</span>
+            <span class="label-text">Select Group (optional)</span>
             <select v-model="requestForm.target_group_id" class="control">
-              <option value="">All groups</option>
+              <option value="">Generate for all groups</option>
               <option v-for="group in groupOptions" :key="group.id" :value="group.id">
                 {{ group.name }}
               </option>
@@ -105,8 +95,17 @@ async function onGenerate() {
 
 .generation-form {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 0.75rem;
+}
+
+.form-info {
+  margin: 0 0 0.5rem 0;
+  padding: 0.75rem;
+  background: var(--color-accent-soft);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  color: var(--color-text);
 }
 
 .full-width {

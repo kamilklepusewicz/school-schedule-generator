@@ -2,32 +2,46 @@
 import { computed, reactive, ref } from 'vue';
 import {
   createEntity,
+  deleteEntity,
   generateTimetables,
   listEntities,
   listTimetableEntries,
   listTimetableGroups,
   swapTimetableEntries,
+  updateEntity,
   updateTimetableEntry,
 } from '../services/schoolAdminRepository';
 
 // SECTION: Shared Reactive State
 const state = reactive({
   teachers: [],
-  classGroups: [],
-  classRooms: [],
+  student_group: [],
+  classroom: [],
   subjects: [],
   classes: [],
+  classroom_type: [],
+  lesson_count: [],
   timetableGroups: [],
   timetableEntries: []
 });
 
 // SECTION: Entity Configuration
-const entityKeys = ['teachers', 'classGroups', 'classRooms', 'subjects', 'classes'];
+const entityKeys = ['teachers', 'student_group', 'classroom', 'subjects', 'classes', 'classroom_type', 'lesson_count'];
 
 // SECTION: Request Status Flags
 const isLoading = ref(false);
 const isInitialized = ref(false);
 const lastGenerationRequest = ref(null);
+
+// SECTION: Utility Helper for Loading State Management
+async function withLoading(asyncFn) {
+  isLoading.value = true;
+  try {
+    return await asyncFn();
+  } finally {
+    isLoading.value = false;
+  }
+}
 
 // SECTION: Data Loading Helpers
 async function fetchEntity(entityName) {
@@ -39,15 +53,11 @@ async function ensureLoaded() {
     return;
   }
 
-  isLoading.value = true;
-
-  try {
+  await withLoading(async () => {
     await Promise.all(entityKeys.map((entityName) => fetchEntity(entityName)));
     state.timetableGroups = await listTimetableGroups();
     isInitialized.value = true;
-  } finally {
-    isLoading.value = false;
-  }
+  });
 }
 
 async function fetchTimetableGroups() {
@@ -60,55 +70,56 @@ async function fetchTimetableEntries(groupId) {
 
 // SECTION: Entity Mutation Operations
 async function addEntity(entityName, payload) {
-  isLoading.value = true;
-  try {
+  await withLoading(async () => {
     await createEntity(entityName, payload);
     await fetchEntity(entityName);
-  } finally {
-    isLoading.value = false;
-  }
+  });
+}
+
+async function editEntity(entityName, entityId, payload) {
+  await withLoading(async () => {
+    await updateEntity(entityName, entityId, payload);
+    await fetchEntity(entityName);
+  });
+}
+
+async function removeEntity(entityName, entityId) {
+  await withLoading(async () => {
+    await deleteEntity(entityName, entityId);
+    await fetchEntity(entityName);
+  });
 }
 
 // SECTION: Timetable Operations
 async function requestTimetableGeneration(payload) {
-  isLoading.value = true;
-  try {
+  return await withLoading(async () => {
     const response = await generateTimetables(payload);
     await fetchTimetableGroups();
     lastGenerationRequest.value = response;
     return response;
-  } finally {
-    isLoading.value = false;
-  }
+  });
 }
 
 async function moveTimetableEntry(groupId, entryId, payload) {
-  isLoading.value = true;
-  try {
+  await withLoading(async () => {
     await updateTimetableEntry(groupId, entryId, payload);
     await fetchTimetableEntries(groupId);
-  } finally {
-    isLoading.value = false;
-  }
+  });
 }
 
 async function swapTimetableEntriesById(groupId, firstId, secondId) {
-  isLoading.value = true;
-  try {
+  await withLoading(async () => {
     await swapTimetableEntries(groupId, firstId, secondId);
     await fetchTimetableEntries(groupId);
-  } finally {
-    isLoading.value = false;
-  }
+  });
 }
 
 const dashboardStats = computed(() => [
   { key: 'teachers', label: 'Teachers', value: state.teachers.length },
-  { key: 'classGroups', label: 'Class Groups', value: state.classGroups.length },
-  { key: 'classRooms', label: 'Class Rooms', value: state.classRooms.length },
+  { key: 'student_group', label: 'Student Groups', value: state.student_group.length },
+  { key: 'classroom', label: 'Classrooms', value: state.classroom.length },
   { key: 'subjects', label: 'Subjects', value: state.subjects.length },
-  { key: 'classes', label: 'Classes', value: state.classes.length },
-  { key: 'timetableGroups', label: 'Timetable Groups', value: state.timetableGroups.length }
+  { key: 'classes', label: 'Classes', value: state.classes.length }
 ]);
 
 // SECTION: Public Composable API
@@ -123,6 +134,8 @@ export function useSchoolAdminData() {
     fetchTimetableGroups,
     fetchTimetableEntries,
     addEntity,
+    editEntity,
+    removeEntity,
     requestTimetableGeneration,
     moveTimetableEntry,
     swapTimetableEntriesById

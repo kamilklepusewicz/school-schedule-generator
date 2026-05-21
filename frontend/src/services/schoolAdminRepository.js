@@ -7,17 +7,19 @@ import {
   updateMockTimetableEntry
 } from './mocks/schoolAdminMockRepository';
 
-// SECTION: Runtime Configuration and Local Cache
+// SECTION: Runtime Configuration
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
-const backendEntities = ['teachers', 'classGroups', 'classRooms', 'subjects', 'classes'];
-const entityEndpointCandidates = {
-  teachers: ['/teachers', '/teacher'],
-  classGroups: ['/class_groups', '/class-groups', '/student-groups', '/student_groups', '/groups'],
-  classRooms: ['/class_rooms', '/class-rooms', '/classrooms', '/classroom', '/rooms'],
-  subjects: ['/subjects', '/subject'],
-  classes: ['/classes', '/lesson', '/lessons']
+
+// Entity-to-endpoint mapping (matches backend routes)
+const entityEndpoints = {
+  teachers: '/teachers',
+  student_group: '/class_groups',
+  classroom: '/class_rooms',
+  subjects: '/subjects',
+  classes: '/classes',
+  classroom_type: '/classroom_types',
+  lesson_count: '/lesson_counts'
 };
-const resolvedEntityEndpoints = new Map();
 
 // SECTION: HTTP Request Utilities
 function buildApiUrl(path) {
@@ -58,253 +60,197 @@ async function requestJson(path, options = {}) {
     throw error;
   }
 
+  // Handle 204 No Content responses (common for DELETE requests)
+  if (response.status === 204) {
+    return {};
+  }
+
   return response.json();
 }
 
-// SECTION: API Data Mapping Utilities
-function fromApiTeacher(teacher) {
-  return {
-    id: teacher.id,
-    first_name: teacher.first_name,
-    last_name: teacher.last_name,
-    subject_id: teacher.subject_id
-  };
-}
-
-function toApiTeacher(teacher) {
-  return {
-    first_name: teacher.first_name,
-    last_name: teacher.last_name,
-    subject_id: Number(teacher.subject_id)
-  };
-}
-
-function fromApiClassGroup(group) {
-  return {
-    id: group.id,
-    name: group.name
-  };
-}
-
-function fromApiClassRoom(room) {
-  return {
-    id: room.id,
-    name: room.name
-  };
-}
-
-function fromApiSubject(subject) {
-  return {
-    id: subject.id,
-    name: subject.name
-  };
-}
-
-function fromApiClass(classEntry) {
-  return {
-    id: classEntry.id,
-    subject_id: classEntry.subject_id,
-    classroom_id: classEntry.classroom_id ?? classEntry.room_id,
-    teacher_id: classEntry.teacher_id,
-    group_id: classEntry.group_id ?? classEntry.classgroup_id,
-    start_time: classEntry.start_time ?? classEntry.start_date,
-    end_time: classEntry.end_time ?? classEntry.end_date,
-    description: classEntry.description ?? ''
-  };
-}
-
-function toApiClassGroup(group) {
-  return [
-    {
-      name: group.name
-    }
-  ];
-}
-
-function toApiClassRoom(room) {
-  return [
-    {
-      name: room.name
-    }
-  ];
-}
-
-function toApiSubject(subject) {
-  return [
-    {
-      name: subject.name
-    }
-  ];
-}
-
-function toApiClass(classEntry) {
-  return [
-    {
-      subject_id: Number(classEntry.subject_id),
-      classroom_id: Number(classEntry.classroom_id),
-      teacher_id: Number(classEntry.teacher_id),
-      group_id: Number(classEntry.group_id),
-      start_time: classEntry.start_time,
-      end_time: classEntry.end_time,
-      description: classEntry.description
-    }
-  ];
-}
-
-const entityApiAdapters = {
-  teachers: {
-    fromApi: fromApiTeacher,
-    toApiCandidates: (payload) => [toApiTeacher(payload)]
-  },
-  classGroups: {
-    fromApi: fromApiClassGroup,
-    toApiCandidates: toApiClassGroup
-  },
-  classRooms: {
-    fromApi: fromApiClassRoom,
-    toApiCandidates: toApiClassRoom
-  },
-  subjects: {
-    fromApi: fromApiSubject,
-    toApiCandidates: toApiSubject
-  },
-  classes: {
-    fromApi: fromApiClass,
-    toApiCandidates: toApiClass
-  }
+// SECTION: Response Normalization (handles field name variations from backend)
+const responseNormalizers = {
+  teachers: (data) => ({
+    id: data.id,
+    first_name: data.first_name,
+    last_name: data.last_name,
+    subject_id: data.subject_id
+  }),
+  student_group: (data) => ({
+    id: data.id,
+    name: data.name
+  }),
+  classroom: (data) => ({
+    id: data.id,
+    name: data.name,
+    classroom_type_id: data.classroom_type_id
+  }),
+  subjects: (data) => ({
+    id: data.id,
+    name: data.name,
+    classroom_type_id: data.classroom_type_id
+  }),
+  classes: (data) => ({
+    id: data.id,
+    subject_id: data.subject_id,
+    classroom_id: data.classroom_id ?? data.room_id,
+    teacher_id: data.teacher_id,
+    group_id: data.group_id ?? data.classgroup_id,
+    day: data.day,
+    start: data.slot
+  }),
+  classroom_type: (data) => ({
+    id: data.id,
+    name: data.name
+  }),
+  lesson_count: (data) => ({
+    id: data.id,
+    student_group_id: data.student_group_id,
+    subject_id: data.subject_id,
+    hours: data.hours
+  })
 };
 
 // SECTION: Generic Data Utilities
-function normalizeListPayload(payload) {
+function normalizeListResponse(payload) {
   if (Array.isArray(payload)) {
     return payload;
   }
-
   if (Array.isArray(payload?.items)) {
     return payload.items;
   }
-
   if (Array.isArray(payload?.data)) {
     return payload.data;
   }
-
   throw new Error('Unexpected list response format from backend API.');
 }
 
-async function resolveEntityEndpoint(entityName) {
-  if (resolvedEntityEndpoints.has(entityName)) {
-    return resolvedEntityEndpoints.get(entityName);
-  }
-
-  const candidates = entityEndpointCandidates[entityName] || [];
-
-  for (const endpoint of candidates) {
-    try {
-      await requestJson(endpoint);
-      resolvedEntityEndpoints.set(entityName, endpoint);
-      return endpoint;
-    } catch (error) {
-      if (error?.status === 404) {
-        continue;
-      }
-
-      throw error;
-    }
-  }
-
-  throw new Error(`No backend endpoint found for "${entityName}".`);
-}
-
 async function listEntityFromBackend(entityName) {
-  const endpoint = await resolveEntityEndpoint(entityName);
-  const payload = await requestJson(endpoint);
-  const items = normalizeListPayload(payload);
-  const normalized = items.map(entityApiAdapters[entityName].fromApi);
+  const endpoint = entityEndpoints[entityName];
+  if (!endpoint) {
+    throw new Error(`Unknown entity: ${entityName}`);
+  }
 
-  return normalized;
+  const response = await requestJson(endpoint);
+  const items = normalizeListResponse(response);
+  const normalizer = responseNormalizers[entityName];
+  
+  return items.map((item) => normalizer ? normalizer(item) : item);
 }
 
 async function createEntityInBackend(entityName, payload) {
-  const endpoint = await resolveEntityEndpoint(entityName);
-  const candidates = entityApiAdapters[entityName].toApiCandidates(payload);
-  let fallbackError = null;
-
-  for (const candidatePayload of candidates) {
-    try {
-      const created = await requestJson(endpoint, {
-        method: 'POST',
-        body: JSON.stringify(candidatePayload)
-      });
-
-      const normalized = entityApiAdapters[entityName].fromApi(created);
-      return normalized;
-    } catch (error) {
-      if (error?.status === 422 || error?.status === 400) {
-        fallbackError = error;
-        continue;
-      }
-
-      throw error;
-    }
+  const endpoint = entityEndpoints[entityName];
+  if (!endpoint) {
+    throw new Error(`Unknown entity: ${entityName}`);
   }
 
-  if (fallbackError) {
-    throw fallbackError;
-  }
-
-  throw new Error(`Could not create ${entityName}.`);
-}
-
-// SECTION: Entity Handler Registry
-const defaultEntityHandler = {
-  list: () => Promise.reject(new Error('No entity handler configured.')),
-  create: () => Promise.reject(new Error('No entity handler configured.'))
-};
-
-const entityHandlerOverrides = {
-  teachers: {
-    list: () => listEntityFromBackend('teachers'),
-    create: (_, payload) => createEntityInBackend('teachers', payload)
-  },
-  classGroups: {
-    list: () => listEntityFromBackend('classGroups'),
-    create: (_, payload) => createEntityInBackend('classGroups', payload)
-  },
-  classRooms: {
-    list: () => listEntityFromBackend('classRooms'),
-    create: (_, payload) => createEntityInBackend('classRooms', payload)
-  },
-  subjects: {
-    list: () => listEntityFromBackend('subjects'),
-    create: (_, payload) => createEntityInBackend('subjects', payload)
-  },
-  classes: {
-    list: () => listEntityFromBackend('classes'),
-    create: (_, payload) => createEntityInBackend('classes', payload)
-  }
-};
-
-function resolveEntityHandler(entityName) {
-  const override = entityHandlerOverrides[entityName];
-  if (!override) {
-    return defaultEntityHandler;
-  }
-
-  return {
-    ...defaultEntityHandler,
-    ...override
+  // Normalize payload to ensure correct types and field mappings
+  let normalizedPayload = {
+    ...payload,
+    subject_id: payload.subject_id ? Number(payload.subject_id) : undefined,
+    classroom_id: payload.classroom_id ? Number(payload.classroom_id) : undefined,
+    teacher_id: payload.teacher_id ? Number(payload.teacher_id) : undefined,
+    group_id: payload.group_id ? Number(payload.group_id) : undefined
   };
+
+  // Map frontend field names to backend field names
+  if (entityName === 'classes') {
+    if (normalizedPayload.start !== undefined) {
+      normalizedPayload.slot = normalizedPayload.start;
+      delete normalizedPayload.start;
+    }
+    delete normalizedPayload.description;
+  }
+
+  // Remove undefined fields
+  Object.keys(normalizedPayload).forEach((key) => {
+    if (normalizedPayload[key] === undefined) {
+      delete normalizedPayload[key];
+    }
+  });
+
+  const response = await requestJson(endpoint, {
+    method: 'POST',
+    body: JSON.stringify(normalizedPayload)
+  });
+
+  const normalizer = responseNormalizers[entityName];
+  return normalizer ? normalizer(response) : response;
 }
 
-// SECTION: Entity API Facade
+async function updateEntityInBackend(entityName, entityId, payload) {
+  const endpoint = entityEndpoints[entityName];
+  if (!endpoint) {
+    throw new Error(`Unknown entity: ${entityName}`);
+  }
+
+  // Normalize payload to ensure correct types
+  let normalizedPayload = {
+    ...payload,
+    subject_id: payload.subject_id ? Number(payload.subject_id) : undefined,
+    classroom_id: payload.classroom_id ? Number(payload.classroom_id) : undefined,
+    teacher_id: payload.teacher_id ? Number(payload.teacher_id) : undefined,
+    group_id: payload.group_id ? Number(payload.group_id) : undefined,
+    classroom_type_id: payload.classroom_type_id ? Number(payload.classroom_type_id) : undefined,
+    student_group_id: payload.student_group_id ? Number(payload.student_group_id) : undefined,
+    hours: payload.hours ? Number(payload.hours) : undefined,
+    day: payload.day ? Number(payload.day) : undefined,
+    start: payload.start ? Number(payload.start) : undefined
+  };
+
+  // Map frontend field names to backend field names
+  if (entityName === 'classes') {
+    if (normalizedPayload.start !== undefined) {
+      normalizedPayload.slot = normalizedPayload.start;
+      delete normalizedPayload.start;
+    }
+    delete normalizedPayload.description;
+  }
+
+  // Remove undefined fields
+  Object.keys(normalizedPayload).forEach((key) => {
+    if (normalizedPayload[key] === undefined) {
+      delete normalizedPayload[key];
+    }
+  });
+
+  const response = await requestJson(`${endpoint}/${entityId}`, {
+    method: 'PUT',
+    body: JSON.stringify(normalizedPayload)
+  });
+
+  const normalizer = responseNormalizers[entityName];
+  return normalizer ? normalizer(response) : response;
+}
+
+async function deleteEntityInBackend(entityName, entityId) {
+  const endpoint = entityEndpoints[entityName];
+  if (!endpoint) {
+    throw new Error(`Unknown entity: ${entityName}`);
+  }
+
+  await requestJson(`${endpoint}/${entityId}`, {
+    method: 'DELETE'
+  });
+
+  return { id: entityId };
+}
+
+// SECTION: Entity API Facade (direct exports)
 export async function listEntities(entityName) {
-  const handler = resolveEntityHandler(entityName);
-  return handler.list(entityName);
+  return listEntityFromBackend(entityName);
 }
 
 export async function createEntity(entityName, payload) {
-  const handler = resolveEntityHandler(entityName);
-  return handler.create(entityName, payload);
+  return createEntityInBackend(entityName, payload);
+}
+
+export async function updateEntity(entityName, entityId, payload) {
+  return updateEntityInBackend(entityName, entityId, payload);
+}
+
+export async function deleteEntity(entityName, entityId) {
+  return deleteEntityInBackend(entityName, entityId);
 }
 
 // SECTION: Timetable API Facade
