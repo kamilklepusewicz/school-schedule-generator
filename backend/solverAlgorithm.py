@@ -100,7 +100,6 @@ def algorytm_planu_lekcji():
             model.Add(zm_a["sala"] != zm_b["sala"]).OnlyEnforceIf(ten_sam_czas)
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 30.0 
     status = solver.Solve(model)
 
 
@@ -114,7 +113,7 @@ def algorytm_planu_lekcji():
                 "teacher_id": zm["dane"]["teacher_id"],
                 "group_id": zm["dane"]["group_id"],
                 "day": solver.Value(zm["dzien"]),
-                "start": solver.Value(zm["godzina"])
+                "slot": solver.Value(zm["godzina"])
             })
         zapisz_wyniki_do_bazy(wygenerowany_plan)
     else:
@@ -123,16 +122,15 @@ def algorytm_planu_lekcji():
 def zapisz_wyniki_do_bazy(wygenerowany_plan):
     print("[+] Rozpoczynam zapis wygenerowanego planu do bazy danych...")
     
-    # Otwieramy bezpieczną sesję do bazy danych (tak jak przy pobieraniu)
+    # Otwieramy sesję do bazy danych
     db = SessionLocal()
     
     try:
-        # 1. CZYSZCZENIE STAREGO PLANU
         # Czyścimy całą tabelę 'lesson', żeby uniknąć duplikatów ze starego generowania
         print("[*] Czyszczenie starego planu lekcji z tabeli 'lesson'...")
         db.query(Lesson).delete()
         
-        # 2. DODAWANIE NOWYCH LEKCJI
+        # Dodawanie nowych lekcji
         print(f"[*] Przygotowywanie {len(wygenerowany_plan)} nowych lekcji do zapisu...")
         for lekcja in wygenerowany_plan:
             # Tworzymy obiekt modelowy SQLAlchemy na podstawie słownika z OR-Tools
@@ -142,18 +140,17 @@ def zapisz_wyniki_do_bazy(wygenerowany_plan):
                 teacher_id=lekcja["teacher_id"],
                 group_id=lekcja["group_id"],
                 day=lekcja["day"],
-                start=lekcja["start"]
+                slot=lekcja["slot"]
             )
             # Dodajemy obiekt do pamięci podręcznej sesji
             db.add(nowa_lekcja)
         
-        # 3. ZATWIERDZENIE TRANSAKCJI
-        # W tym momencie SQLAlchemy wysyła jedno zbiorcze zapytanie INSERT do PostgreSQL
+        # Zatwierdzenie zmian
         db.commit()
         print("[+] SUKCES! Nowy plan lekcji został pomyślnie zapisany w bazie danych.")
         
     except Exception as e:
-        # W razie jakiegokolwiek błędu (np. błąd połączenia, naruszenie klucza obcego),
+        # W razie jakiegokolwiek błędu (np. błąd połączenia, naruszenie klucza obcego)
         # wycofujemy wszystkie zmiany, żeby nie zostawić bazy w niepewnym stanie.
         db.rollback()
         print(f"[-] BŁĄD podczas zapisu do bazy danych: {e}")
@@ -161,3 +158,9 @@ def zapisz_wyniki_do_bazy(wygenerowany_plan):
         
     finally:
         db.close()
+
+if __name__ == "__main__":
+    try:
+        algorytm_planu_lekcji()
+    except Exception as e:
+        print(f"Wystąpił błąd: {e}")
