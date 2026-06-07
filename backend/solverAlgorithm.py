@@ -1,5 +1,7 @@
 from ortools.sat.python import cp_model
 from algorithm_data import fetch_data_for_algorithm
+from database import SessionLocal
+from models import Lesson
 
 def algorytm_planu_lekcji():
     #Pobranie Danych
@@ -119,7 +121,43 @@ def algorytm_planu_lekcji():
         print("[-] Solver nie znalazł rozwiązania spełniającego wszystkie warunki.")
 
 def zapisz_wyniki_do_bazy(wygenerowany_plan):
-    print("Plan wygenerowany pomyślnie")
+    print("[+] Rozpoczynam zapis wygenerowanego planu do bazy danych...")
     
-    for lekcja in sorted(wygenerowany_plan, key=lambda x: (x['day'], x['start'])):
-        print(f"Dane do wstawienia do tabeli 'lesson': {lekcja}")
+    # Otwieramy bezpieczną sesję do bazy danych (tak jak przy pobieraniu)
+    db = SessionLocal()
+    
+    try:
+        # 1. CZYSZCZENIE STAREGO PLANU
+        # Czyścimy całą tabelę 'lesson', żeby uniknąć duplikatów ze starego generowania
+        print("[*] Czyszczenie starego planu lekcji z tabeli 'lesson'...")
+        db.query(Lesson).delete()
+        
+        # 2. DODAWANIE NOWYCH LEKCJI
+        print(f"[*] Przygotowywanie {len(wygenerowany_plan)} nowych lekcji do zapisu...")
+        for lekcja in wygenerowany_plan:
+            # Tworzymy obiekt modelowy SQLAlchemy na podstawie słownika z OR-Tools
+            nowa_lekcja = Lesson(
+                subject_id=lekcja["subject_id"],
+                classroom_id=lekcja["classroom_id"],
+                teacher_id=lekcja["teacher_id"],
+                group_id=lekcja["group_id"],
+                day=lekcja["day"],
+                start=lekcja["start"]
+            )
+            # Dodajemy obiekt do pamięci podręcznej sesji
+            db.add(nowa_lekcja)
+        
+        # 3. ZATWIERDZENIE TRANSAKCJI
+        # W tym momencie SQLAlchemy wysyła jedno zbiorcze zapytanie INSERT do PostgreSQL
+        db.commit()
+        print("[+] SUKCES! Nowy plan lekcji został pomyślnie zapisany w bazie danych.")
+        
+    except Exception as e:
+        # W razie jakiegokolwiek błędu (np. błąd połączenia, naruszenie klucza obcego),
+        # wycofujemy wszystkie zmiany, żeby nie zostawić bazy w niepewnym stanie.
+        db.rollback()
+        print(f"[-] BŁĄD podczas zapisu do bazy danych: {e}")
+        print("[-] Transakcja została wycofana (Rollback).")
+        
+    finally:
+        db.close()
