@@ -44,7 +44,7 @@ async function generateTimetable() {
   generationMessage.value = '';
 
   try {
-    await requestTimetableGeneration({ target_group_id: 'all' });
+    await requestTimetableGeneration();
     generationMessage.value = 'Timetable generated successfully. Opening the management view.';
     await router.push('/timetable-management');
   } catch (error) {

@@ -58,8 +58,8 @@ async function ensureLoaded() {
   });
 }
 
-async function fetchTimetableEntries(groupId) {
-  state.timetableEntries = await listTimetableEntries(groupId);
+async function fetchTimetableEntries(scopeType, scopeId) {
+  state.timetableEntries = await listTimetableEntries(scopeType, scopeId);
 }
 
 // SECTION: Entity Mutation Operations
@@ -85,9 +85,9 @@ async function removeEntity(entityName, entityId) {
 }
 
 // SECTION: Timetable Operations
-async function requestTimetableGeneration(payload) {
+async function requestTimetableGeneration() {
   return await withLoading(async () => {
-    const response = await generateTimetables(payload);
+    const response = await generateTimetables();
     await fetchEntity('classes');
     lastGenerationRequest.value = response;
     return response;
@@ -97,14 +97,14 @@ async function requestTimetableGeneration(payload) {
 async function moveTimetableEntry(groupId, entryId, payload) {
   await withLoading(async () => {
     await updateTimetableEntry(groupId, entryId, payload);
-    await fetchTimetableEntries(groupId);
+    await fetchTimetableEntries('groups', groupId);
   });
 }
 
 async function swapTimetableEntriesById(groupId, firstId, secondId) {
   await withLoading(async () => {
     await swapTimetableEntries(groupId, firstId, secondId);
-    await fetchTimetableEntries(groupId);
+    await fetchTimetableEntries('groups', groupId);
   });
 }
 

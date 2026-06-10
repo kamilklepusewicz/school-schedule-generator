@@ -5,7 +5,8 @@ import { useSchoolAdminData } from '../composables/useSchoolAdminData';
 
 const { state, isLoading, ensureLoaded, fetchTimetableEntries } = useSchoolAdminData();
 
-const selectedGroupId = ref('');
+const selectedPerspective = ref('groups');
+const selectedScopeId = ref('');
 const feedback = ref('');
 const weekDays = [
   { value: 1, label: 'Monday' },
@@ -15,15 +16,24 @@ const weekDays = [
   { value: 5, label: 'Friday' }
 ];
 
+const perspectiveOptions = [
+  { value: 'groups', label: 'Class Groups' },
+  { value: 'teachers', label: 'Teachers' },
+  { value: 'classrooms', label: 'Classrooms' }
+];
+
 onMounted(async () => {
   await ensureLoaded();
-
-  if (state.student_group.length) {
-    selectedGroupId.value = state.student_group[0].id;
-  }
+  syncSelectedScope();
 });
 
-watch(selectedGroupId, async (value) => {
+watch(selectedPerspective, () => {
+  state.timetableEntries = [];
+  selectedScopeId.value = '';
+  syncSelectedScope();
+});
+
+watch([selectedPerspective, selectedScopeId], async ([perspective, value]) => {
   feedback.value = '';
 
   if (!value) {
@@ -32,15 +42,44 @@ watch(selectedGroupId, async (value) => {
   }
 
   try {
-    await fetchTimetableEntries(value);
+    await fetchTimetableEntries(perspective, value);
   } catch (error) {
     feedback.value = error.message;
   }
 });
 
-const selectedGroup = computed(
-  () => state.student_group.find((item) => item.id === selectedGroupId.value) || null
-);
+const scopeOptions = computed(() => {
+  if (selectedPerspective.value === 'teachers') {
+    return state.teachers.map((teacher) => ({
+      id: teacher.id,
+      label: `${teacher.first_name} ${teacher.last_name}`.trim()
+    }));
+  }
+
+  if (selectedPerspective.value === 'classrooms') {
+    return state.classroom.map((room) => ({
+      id: room.id,
+      label: room.name
+    }));
+  }
+
+  return state.student_group.map((group) => ({
+    id: group.id,
+    label: group.name
+  }));
+});
+
+const selectedScope = computed(() => {
+  if (selectedPerspective.value === 'teachers') {
+    return state.teachers.find((teacher) => teacher.id === selectedScopeId.value) || null;
+  }
+
+  if (selectedPerspective.value === 'classrooms') {
+    return state.classroom.find((room) => room.id === selectedScopeId.value) || null;
+  }
+
+  return state.student_group.find((group) => group.id === selectedScopeId.value) || null;
+});
 
 const selectedLessons = computed(() =>
   [...state.timetableEntries].sort((left, right) => {
@@ -69,6 +108,14 @@ const gridRows = computed(() => {
   return rows;
 });
 
+function syncSelectedScope() {
+  const nextScopeId = scopeOptions.value[0]?.id || '';
+
+  if (!selectedScopeId.value || !scopeOptions.value.some((item) => item.id === selectedScopeId.value)) {
+    selectedScopeId.value = nextScopeId;
+  }
+}
+
 function dayName(dayValue) {
   return weekDays.find((day) => day.value === dayValue)?.label || `Day ${dayValue}`;
 }
@@ -82,12 +129,28 @@ function teacherName(teacherId) {
   return teacher ? `${teacher.first_name} ${teacher.last_name}`.trim() : '-';
 }
 
+function groupName(groupId) {
+  return state.student_group.find((item) => item.id === groupId)?.name || '-';
+}
+
 function roomName(roomId) {
   return state.classroom.find((item) => item.id === roomId)?.name || '-';
 }
 
 function lessonMeta(lesson) {
+  if (selectedPerspective.value === 'teachers') {
+    return `${groupName(lesson.group_id)} | ${roomName(lesson.classroom_id)}`;
+  }
+
+  if (selectedPerspective.value === 'classrooms') {
+    return `${groupName(lesson.group_id)} | ${teacherName(lesson.teacher_id)}`;
+  }
+
   return `${teacherName(lesson.teacher_id)} | ${roomName(lesson.classroom_id)}`;
+}
+
+function scopeLabel() {
+  return selectedScope.value?.label || selectedScope.value?.name || 'current selection';
 }
 </script>
 
@@ -95,45 +158,56 @@ function lessonMeta(lesson) {
   <section class="management-layout">
     <AppPageHeader
       title="Timetables Management"
-      description="Pick a class group to inspect the real timetable stored in the backend lessons table."
+      description="View the real timetable for one class group, teacher, or classroom at a time."
     />
 
     <section class="management-grid">
       <article class="card selector-card">
-        <h2 class="section-title">Choose Class Group</h2>
-        <p class="muted">
-          The app stores one timetable dataset in the backend. This view filters it by class group.
-        </p>
+        <h2 class="section-title">Choose View</h2>
+        <p class="muted">Only one timetable perspective can be active at a time.</p>
+
+        <div class="perspective-switcher" role="tablist" aria-label="Timetable perspective">
+          <button
+            v-for="option in perspectiveOptions"
+            :key="option.value"
+            type="button"
+            class="btn tab-btn"
+            :class="{ 'is-active': selectedPerspective === option.value }"
+            @click="selectedPerspective = option.value"
+          >
+            {{ option.label }}
+          </button>
+        </div>
 
         <label class="field">
-          <span class="label-text">Class Group</span>
-          <select v-model="selectedGroupId" class="control" :disabled="isLoading || !state.student_group.length">
-            <option value="">Select a class group...</option>
-            <option v-for="group in state.student_group" :key="group.id" :value="group.id">
-              {{ group.name }}
+          <span class="label-text">{{ perspectiveOptions.find((item) => item.value === selectedPerspective)?.label }}</span>
+          <select v-model="selectedScopeId" class="control" :disabled="isLoading || !scopeOptions.length">
+            <option value="">Select an item...</option>
+            <option v-for="option in scopeOptions" :key="option.id" :value="option.id">
+              {{ option.label }}
             </option>
           </select>
         </label>
 
-        <div class="group-summary" v-if="selectedGroup">
-          <p><strong>Selected:</strong> {{ selectedGroup.name }}</p>
+        <div class="group-summary" v-if="selectedScope">
+          <p><strong>Selected:</strong> {{ selectedScope.label || selectedScope.name || 'Current selection' }}</p>
           <p><strong>Lessons:</strong> {{ selectedLessons.length }}</p>
         </div>
 
-        <p v-else class="muted">Select a class group to render its timetable.</p>
+        <p v-else class="muted">Select a {{ selectedPerspective === 'groups' ? 'class group' : selectedPerspective === 'teachers' ? 'teacher' : 'classroom' }} to render its timetable.</p>
       </article>
 
       <article class="card timetable-card">
         <h2 class="section-title">Timetable</h2>
 
         <p v-if="feedback" class="feedback">{{ feedback }}</p>
-        <p v-else-if="!selectedGroup" class="muted">No class group selected.</p>
-        <p v-else-if="!selectedLessons.length" class="muted">No lessons found for this class group.</p>
+        <p v-else-if="!selectedScope" class="muted">No selection made yet.</p>
+        <p v-else-if="!selectedLessons.length" class="muted">No lessons found for the selected timetable.</p>
         <p v-else class="muted timetable-caption">
-          Showing {{ selectedLessons.length }} lessons for {{ selectedGroup.name }}.
+          Showing {{ selectedLessons.length }} lessons for {{ scopeLabel() }}.
         </p>
 
-        <div v-if="selectedGroup && selectedLessons.length" class="table-wrap">
+        <div v-if="selectedScope && selectedLessons.length" class="table-wrap">
           <table class="table timetable-board">
             <thead>
               <tr>
@@ -178,6 +252,13 @@ function lessonMeta(lesson) {
 .selector-card,
 .timetable-card {
   height: fit-content;
+}
+
+.perspective-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
 }
 
 .group-summary {

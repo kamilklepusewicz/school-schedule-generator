@@ -17,28 +17,6 @@ function buildApiUrl(path) {
   return `${API_BASE_URL}${path}`;
 }
 
-async function requestJsonFromFirstAvailable(paths, options = {}) {
-  let lastError = null;
-
-  for (const path of paths) {
-    try {
-      return await requestJson(path, options);
-    } catch (error) {
-      lastError = error;
-
-      if (error?.status && error.status !== 404 && error.status !== 405) {
-        throw error;
-      }
-    }
-  }
-
-  if (lastError) {
-    throw lastError;
-  }
-
-  throw new Error('Request failed.');
-}
-
 async function requestJson(path, options = {}) {
   let response;
 
@@ -276,15 +254,9 @@ export async function saveBulkLessonCounts(lessonCounts) {
 }
 
 // SECTION: Timetable API Facade
-export async function generateTimetables(payload) {
-  return requestJsonFromFirstAvailable([
-    '/timetables/generate',
-    '/timetable/generate',
-    '/generate_timetable',
-    '/classes/generate'
-  ], {
-    method: 'POST',
-    body: JSON.stringify(payload)
+export async function generateTimetables() {
+  return requestJson('/schedule/generate', {
+    method: 'POST'
   });
 }
 
@@ -292,15 +264,27 @@ export async function listTimetableGroups() {
   return listEntities('student_group');
 }
 
-export async function listTimetableEntries(groupId) {
+export async function listTimetableEntries(scopeType, scopeId) {
   const classes = await listEntities('classes');
 
+  const scopeKeyMap = {
+    groups: 'group_id',
+    teachers: 'teacher_id',
+    classrooms: 'classroom_id'
+  };
+
+  if (scopeId === undefined) {
+    return classes.filter((entry) => String(entry.group_id) === String(scopeType));
+  }
+
+  const scopeKey = scopeKeyMap[scopeType] || 'group_id';
+
   return classes.filter((entry) => {
-    if (!groupId) {
+    if (!scopeId) {
       return true;
     }
 
-    return String(entry.group_id) === String(groupId);
+    return String(entry[scopeKey]) === String(scopeId);
   });
 }
 

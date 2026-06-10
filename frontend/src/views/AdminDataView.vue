@@ -112,7 +112,7 @@ const entityDefinitions = computed(() => {
     },
     classes: {
       title: 'Classes',
-      description: 'Define class assignments linking groups, teachers, rooms, and dates.',
+      description: 'View, add, edit, and delete manual timetable classes.',
       fields: [
         { key: 'subject_id', label: 'Subject', type: 'select', options: subjectOptions },
         { key: 'classroom_id', label: 'Classroom', type: 'select', options: classroomOptions },
@@ -143,6 +143,7 @@ const entityDefinitions = computed(() => {
 
 const currentDefinition = computed(() => entityDefinitions.value[activeTab.value]);
 const currentRows = computed(() => state[activeTab.value]);
+const isClassesTab = computed(() => activeTab.value === 'classes');
 
 async function handleCreate({ entityName, payload }) {
   feedback.value = '';
@@ -240,6 +241,13 @@ function switchToTab(tabName) {
           Go to {{ entityDefinitions[currentDefinition.dependsOn].title }}
         </button>
       </div>
+    </article>
+
+    <article v-if="isClassesTab" class="card info-box">
+      <p class="warning-title">Classes View</p>
+      <p class="warning-text">
+        This table shows the classes stored in the backend timetable. You can add, edit, or delete rows directly here.
+      </p>
     </article>
 
     <EntityCrudPanel
