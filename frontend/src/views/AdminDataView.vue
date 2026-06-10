@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import AppPageHeader from '../components/AppPageHeader.vue';
 import EntityCrudPanel from '../components/admin/EntityCrudPanel.vue';
+import LessonCountPanel from '../components/admin/LessonCountPanel.vue';
 import { useSchoolAdminData } from '../composables/useSchoolAdminData';
 
 const {
@@ -10,7 +11,9 @@ const {
   ensureLoaded,
   addEntity,
   editEntity,
-  removeEntity
+  removeEntity,
+  saveBulkLessonCounts,
+  fetchEntity
 } = useSchoolAdminData();
 
 const activeTab = ref('teachers');
@@ -109,7 +112,7 @@ const entityDefinitions = computed(() => {
     },
     classes: {
       title: 'Classes',
-      description: 'Define class assignments linking groups, teachers, rooms, and dates.',
+      description: 'View, add, edit, and delete manual timetable classes.',
       fields: [
         { key: 'subject_id', label: 'Subject', type: 'select', options: subjectOptions },
         { key: 'classroom_id', label: 'Classroom', type: 'select', options: classroomOptions },
@@ -140,6 +143,7 @@ const entityDefinitions = computed(() => {
 
 const currentDefinition = computed(() => entityDefinitions.value[activeTab.value]);
 const currentRows = computed(() => state[activeTab.value]);
+const isClassesTab = computed(() => activeTab.value === 'classes');
 
 async function handleCreate({ entityName, payload }) {
   feedback.value = '';
@@ -167,6 +171,30 @@ async function handleDelete({ entityName, entityId }) {
   try {
     await removeEntity(entityName, entityId);
     feedback.value = `${entityDefinitions.value[entityName].title}: entry deleted successfully.`;
+  } catch (error) {
+    feedback.value = error.message;
+  }
+}
+
+async function handleSaveLessonCounts({ studentGroupId, lessonCounts }) {
+  feedback.value = '';
+
+  try {
+    // Send all lesson counts as a single batch request
+    const formattedData = lessonCounts.map((item) => ({
+      id: item.id,
+      student_group_id: item.student_group_id,
+      subject_id: item.subject_id,
+      hours: Number(item.hours)
+    }));
+
+    await saveBulkLessonCounts(formattedData);
+
+    // Refresh lesson_count data from backend
+    await fetchEntity('lesson_count');
+
+    const groupName = state.student_group.find((g) => g.id === studentGroupId)?.name;
+    feedback.value = `Lesson hours updated successfully for ${groupName}.`;
   } catch (error) {
     feedback.value = error.message;
   }
@@ -215,7 +243,15 @@ function switchToTab(tabName) {
       </div>
     </article>
 
+    <article v-if="isClassesTab" class="card info-box">
+      <p class="warning-title">Classes View</p>
+      <p class="warning-text">
+        This table shows the classes stored in the backend timetable. You can add, edit, or delete rows directly here.
+      </p>
+    </article>
+
     <EntityCrudPanel
+      v-if="activeTab !== 'lesson_count'"
       :entity-name="activeTab"
       :title="currentDefinition.title"
       :description="currentDefinition.description"
@@ -225,6 +261,15 @@ function switchToTab(tabName) {
       @create="handleCreate"
       @edit="handleEdit"
       @delete="handleDelete"
+    />
+
+    <LessonCountPanel
+      v-if="activeTab === 'lesson_count'"
+      :student-groups="state.student_group"
+      :subjects="state.subjects"
+      :lesson-counts="state.lesson_count"
+      :busy="isLoading"
+      @save="handleSaveLessonCounts"
     />
   </section>
 </template>

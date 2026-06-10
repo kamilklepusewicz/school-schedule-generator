@@ -6,10 +6,10 @@ import {
   generateTimetables,
   listEntities,
   listTimetableEntries,
-  listTimetableGroups,
   swapTimetableEntries,
   updateEntity,
   updateTimetableEntry,
+  saveBulkLessonCounts,
 } from '../services/schoolAdminRepository';
 
 // SECTION: Shared Reactive State
@@ -21,7 +21,6 @@ const state = reactive({
   classes: [],
   classroom_type: [],
   lesson_count: [],
-  timetableGroups: [],
   timetableEntries: []
 });
 
@@ -55,17 +54,12 @@ async function ensureLoaded() {
 
   await withLoading(async () => {
     await Promise.all(entityKeys.map((entityName) => fetchEntity(entityName)));
-    state.timetableGroups = await listTimetableGroups();
     isInitialized.value = true;
   });
 }
 
-async function fetchTimetableGroups() {
-  state.timetableGroups = await listTimetableGroups();
-}
-
-async function fetchTimetableEntries(groupId) {
-  state.timetableEntries = await listTimetableEntries(groupId);
+async function fetchTimetableEntries(scopeType, scopeId) {
+  state.timetableEntries = await listTimetableEntries(scopeType, scopeId);
 }
 
 // SECTION: Entity Mutation Operations
@@ -91,10 +85,10 @@ async function removeEntity(entityName, entityId) {
 }
 
 // SECTION: Timetable Operations
-async function requestTimetableGeneration(payload) {
+async function requestTimetableGeneration() {
   return await withLoading(async () => {
-    const response = await generateTimetables(payload);
-    await fetchTimetableGroups();
+    const response = await generateTimetables();
+    await fetchEntity('classes');
     lastGenerationRequest.value = response;
     return response;
   });
@@ -103,14 +97,14 @@ async function requestTimetableGeneration(payload) {
 async function moveTimetableEntry(groupId, entryId, payload) {
   await withLoading(async () => {
     await updateTimetableEntry(groupId, entryId, payload);
-    await fetchTimetableEntries(groupId);
+    await fetchTimetableEntries('groups', groupId);
   });
 }
 
 async function swapTimetableEntriesById(groupId, firstId, secondId) {
   await withLoading(async () => {
     await swapTimetableEntries(groupId, firstId, secondId);
-    await fetchTimetableEntries(groupId);
+    await fetchTimetableEntries('groups', groupId);
   });
 }
 
@@ -131,13 +125,13 @@ export function useSchoolAdminData() {
     dashboardStats,
     ensureLoaded,
     fetchEntity,
-    fetchTimetableGroups,
     fetchTimetableEntries,
     addEntity,
     editEntity,
     removeEntity,
     requestTimetableGeneration,
     moveTimetableEntry,
-    swapTimetableEntriesById
+    swapTimetableEntriesById,
+    saveBulkLessonCounts
   };
 }

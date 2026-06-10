@@ -5,8 +5,7 @@ from sqlalchemy.orm import Session
 from database import engine, Base, get_db
 from models import *
 from schemas import *
-from algorithm_data import fetch_data_for_algorithm
-from scheduler import solve_schedule
+from solverAlgorithm import algorytm_planu_lekcji
 
 Base.metadata.create_all(bind=engine)
 
@@ -348,9 +347,7 @@ def delete_lesson_count(count_id: int, db: Session = Depends(get_db)):
 
 @app.post("/schedule/generate", status_code=status.HTTP_200_OK)
 def generate_school_schedule(db: Session = Depends(get_db)):
-    input_data = fetch_data_for_algorithm()
-    
-    raw_schedule = solve_schedule(input_data)
+    raw_schedule = algorytm_planu_lekcji()
     
     if not raw_schedule:
         raise HTTPException(status_code=400, detail="Algorytm nie ułożył planu przy tych ograniczeniach")

@@ -1,12 +1,3 @@
-// SECTION: Imports
-import {
-  generateMockTimetables,
-  listMockTimetableEntries,
-  listMockTimetableGroups,
-  swapMockTimetableEntries,
-  updateMockTimetableEntry
-} from './mocks/schoolAdminMockRepository';
-
 // SECTION: Runtime Configuration
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 
@@ -97,6 +88,7 @@ const responseNormalizers = {
     teacher_id: data.teacher_id,
     group_id: data.group_id ?? data.classgroup_id,
     day: data.day,
+    slot: data.slot,
     start: data.slot
   }),
   classroom_type: (data) => ({
@@ -253,23 +245,69 @@ export async function deleteEntity(entityName, entityId) {
   return deleteEntityInBackend(entityName, entityId);
 }
 
+export async function saveBulkLessonCounts(lessonCounts) {
+  const response = await requestJson('/lesson_counts/batch', {
+    method: 'POST',
+    body: JSON.stringify(lessonCounts)
+  });
+  return response;
+}
+
 // SECTION: Timetable API Facade
-export async function generateTimetables(payload) {
-  return generateMockTimetables(payload);
+export async function generateTimetables() {
+  return requestJson('/schedule/generate', {
+    method: 'POST'
+  });
 }
 
 export async function listTimetableGroups() {
-  return listMockTimetableGroups();
+  return listEntities('student_group');
 }
 
-export async function listTimetableEntries(groupId) {
-  return listMockTimetableEntries(groupId);
+export async function listTimetableEntries(scopeType, scopeId) {
+  const classes = await listEntities('classes');
+
+  const scopeKeyMap = {
+    groups: 'group_id',
+    teachers: 'teacher_id',
+    classrooms: 'classroom_id'
+  };
+
+  if (scopeId === undefined) {
+    return classes.filter((entry) => String(entry.group_id) === String(scopeType));
+  }
+
+  const scopeKey = scopeKeyMap[scopeType] || 'group_id';
+
+  return classes.filter((entry) => {
+    if (!scopeId) {
+      return true;
+    }
+
+    return String(entry[scopeKey]) === String(scopeId);
+  });
 }
 
 export async function updateTimetableEntry(groupId, entryId, payload) {
-  return updateMockTimetableEntry(groupId, entryId, payload);
+  return updateEntityInBackend('classes', entryId, payload);
 }
 
 export async function swapTimetableEntries(groupId, entryIdA, entryIdB) {
-  return swapMockTimetableEntries(groupId, entryIdA, entryIdB);
+  const entries = await listTimetableEntries(groupId);
+  const firstEntry = entries.find((entry) => entry.id === entryIdA);
+  const secondEntry = entries.find((entry) => entry.id === entryIdB);
+
+  if (!firstEntry || !secondEntry) {
+    throw new Error('Swap failed. Entry missing.');
+  }
+
+  await updateEntityInBackend('classes', firstEntry.id, {
+    day: secondEntry.day,
+    start: secondEntry.slot
+  });
+
+  return updateEntityInBackend('classes', secondEntry.id, {
+    day: firstEntry.day,
+    start: firstEntry.slot
+  });
 }
