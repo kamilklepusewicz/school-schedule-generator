@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from database import engine, Base, get_db
 from models import *
 from schemas import *
+from algorithm_data import fetch_data_for_algorithm
+from scheduler import solve_schedule
 
 Base.metadata.create_all(bind=engine)
 
@@ -293,16 +295,23 @@ def delete_classroom_type(type_id: int, db: Session = Depends(get_db)):
 
 # ENDPOINTY LICZBY GODZIN PRZEDMIOTU DLA GRUPY
 @app.post("/lesson_counts", response_model=list[LessonCountResponse], status_code=status.HTTP_201_CREATED)
-def create_lesson_count(lesson_count: LessonCountCreate, db: Session = Depends(get_db)):
-    new_lesson_count = LessonCount(
-        student_group_id = lesson_count.student_group_id,
-        subject_id = lesson_count.subject_id,
-        hours = lesson_count.hours
-    )
-    db.add(new_lesson_count)
+def create_lesson_count(lesson_counts: list[LessonCountCreate], db: Session = Depends(get_db)):
+    new_lesson_counts = []
+    for lesson_count in lesson_counts:
+        new_lesson_count = LessonCount(
+            student_group_id = lesson_count.student_group_id,
+            subject_id = lesson_count.subject_id,
+            hours = lesson_count.hours
+        )
+        new_lesson_counts.append(new_lesson_count)
+
+    db.add_all(new_lesson_counts)
     db.commit()
-    db.refresh(new_lesson_count)
-    return new_lesson_count
+    
+    for lesson_count in new_lesson_counts:
+        db.refresh(lesson_count)
+
+    return new_lesson_counts
 
 
 @app.get("/lesson_counts", response_model=list[LessonCountResponse])
@@ -335,3 +344,30 @@ def delete_lesson_count(count_id: int, db: Session = Depends(get_db)):
     db.delete(db_count)
     db.commit()
     return
+
+
+@app.post("/schedule/generate", status_code=status.HTTP_200_OK)
+def generate_school_schedule(db: Session = Depends(get_db)):
+    input_data = fetch_data_for_algorithm()
+    
+    raw_schedule = solve_schedule(input_data)
+    
+    if not raw_schedule:
+        raise HTTPException(status_code=400, detail="Algorytm nie ułożył planu przy tych ograniczeniach")
+    
+    db.query(Lesson).delete()
+    
+    for item in raw_schedule:
+        new_lesson = Lesson(
+            subject_id=item["subject_id"],
+            classroom_id=item["classroom_id"],
+            teacher_id=item["teacher_id"],
+            group_id=item["group_id"],
+            slot=item["slot"],
+            day=item["day"]
+        )
+        db.add(new_lesson)
+        
+    db.commit()
+    
+    return {"message": "Plan wygenerowany i zapisany pomyślnie"}
