@@ -253,6 +253,14 @@ export async function deleteEntity(entityName, entityId) {
   return deleteEntityInBackend(entityName, entityId);
 }
 
+export async function saveBulkLessonCounts(lessonCounts) {
+  const response = await requestJson('/lesson_counts/batch', {
+    method: 'POST',
+    body: JSON.stringify(lessonCounts)
+  });
+  return response;
+}
+
 // SECTION: Timetable API Facade
 export async function generateTimetables(payload) {
   return generateMockTimetables(payload);

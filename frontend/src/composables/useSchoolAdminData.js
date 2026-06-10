@@ -10,6 +10,7 @@ import {
   swapTimetableEntries,
   updateEntity,
   updateTimetableEntry,
+  saveBulkLessonCounts,
 } from '../services/schoolAdminRepository';
 
 // SECTION: Shared Reactive State
@@ -138,6 +139,7 @@ export function useSchoolAdminData() {
     removeEntity,
     requestTimetableGeneration,
     moveTimetableEntry,
-    swapTimetableEntriesById
+    swapTimetableEntriesById,
+    saveBulkLessonCounts
   };
 }

@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import AppPageHeader from '../components/AppPageHeader.vue';
 import EntityCrudPanel from '../components/admin/EntityCrudPanel.vue';
+import LessonCountPanel from '../components/admin/LessonCountPanel.vue';
 import { useSchoolAdminData } from '../composables/useSchoolAdminData';
 
 const {
@@ -10,7 +11,9 @@ const {
   ensureLoaded,
   addEntity,
   editEntity,
-  removeEntity
+  removeEntity,
+  saveBulkLessonCounts,
+  fetchEntity
 } = useSchoolAdminData();
 
 const activeTab = ref('teachers');
@@ -172,6 +175,30 @@ async function handleDelete({ entityName, entityId }) {
   }
 }
 
+async function handleSaveLessonCounts({ studentGroupId, lessonCounts }) {
+  feedback.value = '';
+
+  try {
+    // Send all lesson counts as a single batch request
+    const formattedData = lessonCounts.map((item) => ({
+      id: item.id,
+      student_group_id: item.student_group_id,
+      subject_id: item.subject_id,
+      hours: Number(item.hours)
+    }));
+
+    await saveBulkLessonCounts(formattedData);
+
+    // Refresh lesson_count data from backend
+    await fetchEntity('lesson_count');
+
+    const groupName = state.student_group.find((g) => g.id === studentGroupId)?.name;
+    feedback.value = `Lesson hours updated successfully for ${groupName}.`;
+  } catch (error) {
+    feedback.value = error.message;
+  }
+}
+
 function switchToTab(tabName) {
   activeTab.value = tabName;
   feedback.value = '';
@@ -216,6 +243,7 @@ function switchToTab(tabName) {
     </article>
 
     <EntityCrudPanel
+      v-if="activeTab !== 'lesson_count'"
       :entity-name="activeTab"
       :title="currentDefinition.title"
       :description="currentDefinition.description"
@@ -225,6 +253,15 @@ function switchToTab(tabName) {
       @create="handleCreate"
       @edit="handleEdit"
       @delete="handleDelete"
+    />
+
+    <LessonCountPanel
+      v-if="activeTab === 'lesson_count'"
+      :student-groups="state.student_group"
+      :subjects="state.subjects"
+      :lesson-counts="state.lesson_count"
+      :busy="isLoading"
+      @save="handleSaveLessonCounts"
     />
   </section>
 </template>
