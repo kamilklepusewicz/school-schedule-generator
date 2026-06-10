@@ -1,169 +1,93 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import AppPageHeader from '../components/AppPageHeader.vue';
 import { useSchoolAdminData } from '../composables/useSchoolAdminData';
 
-const {
-  state,
-  isLoading,
-  ensureLoaded,
-  fetchTimetableEntries,
-  moveTimetableEntry,
-  swapTimetableEntriesById
-} = useSchoolAdminData();
+const { state, isLoading, ensureLoaded, fetchTimetableEntries } = useSchoolAdminData();
 
 const selectedGroupId = ref('');
-const perspective = ref('groups');
-const selectedScope = ref('');
 const feedback = ref('');
-const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-
-const moveForm = reactive({
-  entryId: '',
-  day: 'Monday',
-  slot: 1
-});
-
-const swapForm = reactive({
-  firstId: '',
-  secondId: ''
-});
+const weekDays = [
+  { value: 1, label: 'Monday' },
+  { value: 2, label: 'Tuesday' },
+  { value: 3, label: 'Wednesday' },
+  { value: 4, label: 'Thursday' },
+  { value: 5, label: 'Friday' }
+];
 
 onMounted(async () => {
   await ensureLoaded();
 
-  if (state.timetableGroups.length) {
-    selectedGroupId.value = state.timetableGroups[0].id;
+  if (state.student_group.length) {
+    selectedGroupId.value = state.student_group[0].id;
   }
 });
 
 watch(selectedGroupId, async (value) => {
+  feedback.value = '';
+
   if (!value) {
+    state.timetableEntries = [];
     return;
   }
 
-  await fetchTimetableEntries(value);
-  selectedScope.value = '';
-  moveForm.entryId = '';
-  swapForm.firstId = '';
-  swapForm.secondId = '';
-});
-
-watch(perspective, () => {
-  selectedScope.value = '';
+  try {
+    await fetchTimetableEntries(value);
+  } catch (error) {
+    feedback.value = error.message;
+  }
 });
 
 const selectedGroup = computed(
-  () => state.timetableGroups.find((item) => item.id === selectedGroupId.value) || null
+  () => state.student_group.find((item) => item.id === selectedGroupId.value) || null
 );
 
-const perspectiveKeyMap = computed(() => ({
-  groups: 'group_name',
-  rooms: 'room_name',
-  teachers: 'teacher_name'
-}));
-
-const currentPerspectiveKey = computed(
-  () => perspectiveKeyMap.value[perspective.value] || 'group_name'
-);
-
-const scopeOptions = computed(() => {
-  const unique = new Map();
-  state.timetableEntries.forEach((entry) => {
-    unique.set(entry[currentPerspectiveKey.value], entry[currentPerspectiveKey.value]);
-  });
-  return Array.from(unique.values());
-});
-
-const visibleEntries = computed(() => {
-  if (!selectedScope.value) {
-    return state.timetableEntries;
-  }
-  return state.timetableEntries.filter(
-    (entry) => entry[currentPerspectiveKey.value] === selectedScope.value
-  );
-});
-
-const entryOptions = computed(() =>
-  state.timetableEntries.map((entry) => ({
-    value: entry.id,
-    label: `${entry.subject_name} | ${entry.group_name} | ${entry.day} ${entry.slot}`
-  }))
-);
-
-const entriesByScope = computed(() => {
-  const map = new Map();
-  visibleEntries.value.forEach((entry) => {
-    const scopeName = entry[currentPerspectiveKey.value];
-    if (!map.has(scopeName)) {
-      map.set(scopeName, []);
+const selectedLessons = computed(() =>
+  [...state.timetableEntries].sort((left, right) => {
+    if (left.day !== right.day) {
+      return left.day - right.day;
     }
-    map.get(scopeName).push(entry);
-  });
-  return Array.from(map.entries()).map(([scope, entries]) => ({ scope, entries }));
-});
 
-function buildGridRows(entries) {
-  const maxSlot = Math.max(8, ...entries.map((entry) => entry.slot));
+    return left.slot - right.slot;
+  })
+);
+
+const maxSlot = computed(() => Math.max(8, ...selectedLessons.value.map((entry) => entry.slot)));
+
+const gridRows = computed(() => {
   const rows = [];
 
-  for (let slot = 1; slot <= maxSlot; slot += 1) {
-    const dayCells = weekDays.map((day) =>
-      entries.filter((entry) => entry.day === day && entry.slot === slot)
-    );
-
+  for (let slot = 1; slot <= maxSlot.value; slot += 1) {
     rows.push({
       slot,
-      dayCells
+      cells: weekDays.map((day) =>
+        selectedLessons.value.filter((entry) => entry.day === day.value && entry.slot === slot)
+      )
     });
   }
 
   return rows;
+});
+
+function dayName(dayValue) {
+  return weekDays.find((day) => day.value === dayValue)?.label || `Day ${dayValue}`;
 }
 
-function tileMeta(entry) {
-  if (perspective.value === 'groups') {
-    return `${entry.teacher_name} | ${entry.room_name}`;
-  }
-
-  if (perspective.value === 'rooms') {
-    return `${entry.group_name} | ${entry.teacher_name}`;
-  }
-
-  return `${entry.group_name} | ${entry.room_name}`;
+function subjectName(subjectId) {
+  return state.subjects.find((item) => item.id === subjectId)?.name || '-';
 }
 
-async function submitMove() {
-  feedback.value = '';
-
-  if (!selectedGroupId.value || !moveForm.entryId) {
-    return;
-  }
-
-  try {
-    await moveTimetableEntry(selectedGroupId.value, moveForm.entryId, {
-      day: moveForm.day,
-      slot: Number(moveForm.slot)
-    });
-    feedback.value = 'Class placement updated successfully.';
-  } catch (error) {
-    feedback.value = error.message;
-  }
+function teacherName(teacherId) {
+  const teacher = state.teachers.find((item) => item.id === teacherId);
+  return teacher ? `${teacher.first_name} ${teacher.last_name}`.trim() : '-';
 }
 
-async function submitSwap() {
-  feedback.value = '';
+function roomName(roomId) {
+  return state.classroom.find((item) => item.id === roomId)?.name || '-';
+}
 
-  if (!selectedGroupId.value || !swapForm.firstId || !swapForm.secondId) {
-    return;
-  }
-
-  try {
-    await swapTimetableEntriesById(selectedGroupId.value, swapForm.firstId, swapForm.secondId);
-    feedback.value = 'Classes swapped successfully.';
-  } catch (error) {
-    feedback.value = error.message;
-  }
+function lessonMeta(lesson) {
+  return `${teacherName(lesson.teacher_id)} | ${roomName(lesson.classroom_id)}`;
 }
 </script>
 
@@ -171,174 +95,70 @@ async function submitSwap() {
   <section class="management-layout">
     <AppPageHeader
       title="Timetables Management"
-      description="Open generated timetable groups and manually move or swap classes when fine-tuning schedules."
+      description="Pick a class group to inspect the real timetable stored in the backend lessons table."
     />
 
     <section class="management-grid">
-      <article class="card groups-list">
-        <h2 class="section-title">Generated Timetable Groups</h2>
-
-        <p v-if="!state.timetableGroups.length" class="muted">
-          No generated groups yet. Use Timetable Generation first.
+      <article class="card selector-card">
+        <h2 class="section-title">Choose Class Group</h2>
+        <p class="muted">
+          The app stores one timetable dataset in the backend. This view filters it by class group.
         </p>
 
-        <div v-else class="table-wrap">
-          <table class="table">
+        <label class="field">
+          <span class="label-text">Class Group</span>
+          <select v-model="selectedGroupId" class="control" :disabled="isLoading || !state.student_group.length">
+            <option value="">Select a class group...</option>
+            <option v-for="group in state.student_group" :key="group.id" :value="group.id">
+              {{ group.name }}
+            </option>
+          </select>
+        </label>
+
+        <div class="group-summary" v-if="selectedGroup">
+          <p><strong>Selected:</strong> {{ selectedGroup.name }}</p>
+          <p><strong>Lessons:</strong> {{ selectedLessons.length }}</p>
+        </div>
+
+        <p v-else class="muted">Select a class group to render its timetable.</p>
+      </article>
+
+      <article class="card timetable-card">
+        <h2 class="section-title">Timetable</h2>
+
+        <p v-if="feedback" class="feedback">{{ feedback }}</p>
+        <p v-else-if="!selectedGroup" class="muted">No class group selected.</p>
+        <p v-else-if="!selectedLessons.length" class="muted">No lessons found for this class group.</p>
+        <p v-else class="muted timetable-caption">
+          Showing {{ selectedLessons.length }} lessons for {{ selectedGroup.name }}.
+        </p>
+
+        <div v-if="selectedGroup && selectedLessons.length" class="table-wrap">
+          <table class="table timetable-board">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Scope</th>
-                <th>Status</th>
-                <th>Created</th>
+                <th class="hour-col">Slot</th>
+                <th v-for="day in weekDays" :key="day.value">{{ day.label }}</th>
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="group in state.timetableGroups"
-                :key="group.id"
-                :class="{ 'is-selected': selectedGroupId === group.id }"
-                @click="selectedGroupId = group.id"
-              >
-                <td>{{ group.name }}</td>
-                <td>{{ group.scope }}</td>
-                <td>{{ group.status }}</td>
-                <td>{{ new Date(group.created_at).toLocaleString() }}</td>
+              <tr v-for="row in gridRows" :key="row.slot">
+                <td class="hour-col">{{ row.slot }}</td>
+                <td v-for="(cellEntries, index) in row.cells" :key="`${row.slot}-${weekDays[index].value}`">
+                  <div v-if="cellEntries.length" class="lesson-stack">
+                    <article v-for="lesson in cellEntries" :key="lesson.id" class="lesson-tile">
+                      <p class="lesson-title">{{ subjectName(lesson.subject_id) }}</p>
+                      <p class="lesson-meta">{{ lessonMeta(lesson) }}</p>
+                      <p class="lesson-day">{{ dayName(lesson.day) }}</p>
+                    </article>
+                  </div>
+                  <span v-else class="empty-slot">-</span>
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
       </article>
-
-      <section class="details-grid">
-        <article class="card">
-          <h2 class="section-title">View Timetable Perspective</h2>
-
-          <div class="controls-grid">
-            <label class="field">
-              <span class="label-text">Perspective</span>
-              <select v-model="perspective" class="control" :disabled="!selectedGroup">
-                <option value="groups">Class Groups</option>
-                <option value="rooms">Class Rooms</option>
-                <option value="teachers">Teachers</option>
-              </select>
-            </label>
-
-            <label class="field">
-              <span class="label-text">Filter</span>
-              <select v-model="selectedScope" class="control" :disabled="!selectedGroup">
-                <option value="">All</option>
-                <option v-for="option in scopeOptions" :key="option" :value="option">{{ option }}</option>
-              </select>
-            </label>
-          </div>
-        </article>
-
-        <article class="card">
-          <h2 class="section-title">Manual Edits</h2>
-
-          <div class="edit-grid">
-            <form class="card nested-card" @submit.prevent="submitMove">
-              <h3>Move Class</h3>
-              <label class="field">
-                <span class="label-text">Class</span>
-                <select v-model="moveForm.entryId" class="control" :disabled="!selectedGroup">
-                  <option value="">Select class...</option>
-                  <option v-for="entry in entryOptions" :key="entry.value" :value="entry.value">
-                    {{ entry.label }}
-                  </option>
-                </select>
-              </label>
-              <div class="pair-grid">
-                <label class="field">
-                  <span class="label-text">Day</span>
-                  <select v-model="moveForm.day" class="control">
-                    <option>Monday</option>
-                    <option>Tuesday</option>
-                    <option>Wednesday</option>
-                    <option>Thursday</option>
-                    <option>Friday</option>
-                  </select>
-                </label>
-                <label class="field">
-                  <span class="label-text">Hour Slot</span>
-                  <input v-model.number="moveForm.slot" type="number" class="control" min="1" max="12" />
-                </label>
-              </div>
-              <button type="submit" class="btn btn-primary" :disabled="isLoading">Apply Move</button>
-            </form>
-
-            <form class="card nested-card" @submit.prevent="submitSwap">
-              <h3>Swap Two Classes</h3>
-              <label class="field">
-                <span class="label-text">Class A</span>
-                <select v-model="swapForm.firstId" class="control" :disabled="!selectedGroup">
-                  <option value="">Select class...</option>
-                  <option v-for="entry in entryOptions" :key="entry.value" :value="entry.value">
-                    {{ entry.label }}
-                  </option>
-                </select>
-              </label>
-              <label class="field">
-                <span class="label-text">Class B</span>
-                <select v-model="swapForm.secondId" class="control" :disabled="!selectedGroup">
-                  <option value="">Select class...</option>
-                  <option v-for="entry in entryOptions" :key="entry.value" :value="entry.value">
-                    {{ entry.label }}
-                  </option>
-                </select>
-              </label>
-              <button type="submit" class="btn" :disabled="isLoading">Swap Slots</button>
-            </form>
-          </div>
-
-          <p v-if="feedback" class="feedback">{{ feedback }}</p>
-        </article>
-
-        <article class="card">
-          <h2 class="section-title">Timetable Details</h2>
-          <p v-if="!selectedGroup" class="muted">Select a timetable group first.</p>
-          <p v-else class="muted">
-            Showing {{ visibleEntries.length }} classes from {{ selectedGroup.name }}.
-          </p>
-
-          <p v-if="selectedGroup && !entriesByScope.length" class="muted no-entries">
-            No classes available for the selected perspective/filter.
-          </p>
-
-          <div v-for="scopeBlock in entriesByScope" :key="scopeBlock.scope" class="scope-board">
-            <h3 class="scope-title">{{ scopeBlock.scope }}</h3>
-
-            <div class="table-wrap">
-              <table class="table timetable-board">
-                <thead>
-                  <tr>
-                    <th class="hour-col">Hour</th>
-                    <th v-for="day in weekDays" :key="day">{{ day }}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="row in buildGridRows(scopeBlock.entries)" :key="row.slot">
-                    <td class="hour-col">{{ row.slot }}</td>
-                    <td v-for="(cellEntries, index) in row.dayCells" :key="`${row.slot}-${weekDays[index]}`">
-                      <div v-if="cellEntries.length" class="lesson-stack">
-                        <article
-                          v-for="entry in cellEntries"
-                          :key="entry.id"
-                          class="lesson-tile"
-                        >
-                          <p class="lesson-title">{{ entry.subject_name }}</p>
-                          <p class="lesson-meta">{{ tileMeta(entry) }}</p>
-                        </article>
-                      </div>
-                      <span v-else class="empty-slot">-</span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </article>
-      </section>
     </section>
   </section>
 </template>
@@ -351,66 +171,32 @@ async function submitSwap() {
 
 .management-grid {
   display: grid;
-  grid-template-columns: minmax(340px, 430px) 1fr;
+  grid-template-columns: minmax(280px, 360px) 1fr;
   gap: 1rem;
 }
 
-.groups-list tbody tr {
-  cursor: pointer;
+.selector-card,
+.timetable-card {
+  height: fit-content;
 }
 
-.groups-list tbody tr.is-selected {
+.group-summary {
+  margin-top: 0.85rem;
+  padding: 0.75rem;
+  border-radius: var(--radius-md);
   background: var(--color-accent-soft);
-}
-
-.details-grid {
   display: grid;
-  gap: 1rem;
+  gap: 0.25rem;
 }
 
-.controls-grid,
-.pair-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
-}
-
-.edit-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
-}
-
-.nested-card {
-  box-shadow: none;
-  border-style: dashed;
-}
-
-.nested-card h3 {
-  margin: 0 0 0.6rem;
-  font-size: 1rem;
-}
-
-.nested-card .btn {
-  margin-top: 0.7rem;
+.group-summary p,
+.feedback,
+.timetable-caption {
+  margin: 0;
 }
 
 .feedback {
-  margin: 0.85rem 0 0;
-  color: var(--color-accent-strong);
-}
-
-.no-entries {
-  margin-top: 0.8rem;
-}
-
-.scope-board {
-  margin-top: 1rem;
-}
-
-.scope-title {
-  margin: 0 0 0.55rem;
-  font-size: 1rem;
+  margin-bottom: 0.75rem;
   color: var(--color-accent-strong);
 }
 
@@ -423,18 +209,19 @@ async function submitSwap() {
 
 .lesson-stack {
   display: grid;
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
 
 .lesson-tile {
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-accent-soft) 75%, white);
-  padding: 0.45rem;
+  padding: 0.6rem;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-border);
 }
 
 .lesson-title,
-.lesson-meta {
+.lesson-meta,
+.lesson-day {
   margin: 0;
 }
 
@@ -442,26 +229,18 @@ async function submitSwap() {
   font-weight: 700;
 }
 
-.lesson-meta {
-  margin-top: 0.2rem;
-  color: var(--color-text-muted);
+.lesson-meta,
+.lesson-day {
   font-size: 0.84rem;
+  color: var(--color-text-muted);
 }
 
 .empty-slot {
   color: var(--color-text-muted);
 }
 
-@media (max-width: 1100px) {
-  .management-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media (max-width: 900px) {
-  .controls-grid,
-  .pair-grid,
-  .edit-grid {
+  .management-grid {
     grid-template-columns: 1fr;
   }
 }

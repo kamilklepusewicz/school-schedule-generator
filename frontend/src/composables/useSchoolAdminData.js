@@ -6,7 +6,6 @@ import {
   generateTimetables,
   listEntities,
   listTimetableEntries,
-  listTimetableGroups,
   swapTimetableEntries,
   updateEntity,
   updateTimetableEntry,
@@ -22,7 +21,6 @@ const state = reactive({
   classes: [],
   classroom_type: [],
   lesson_count: [],
-  timetableGroups: [],
   timetableEntries: []
 });
 
@@ -56,13 +54,8 @@ async function ensureLoaded() {
 
   await withLoading(async () => {
     await Promise.all(entityKeys.map((entityName) => fetchEntity(entityName)));
-    state.timetableGroups = await listTimetableGroups();
     isInitialized.value = true;
   });
-}
-
-async function fetchTimetableGroups() {
-  state.timetableGroups = await listTimetableGroups();
 }
 
 async function fetchTimetableEntries(groupId) {
@@ -95,7 +88,7 @@ async function removeEntity(entityName, entityId) {
 async function requestTimetableGeneration(payload) {
   return await withLoading(async () => {
     const response = await generateTimetables(payload);
-    await fetchTimetableGroups();
+    await fetchEntity('classes');
     lastGenerationRequest.value = response;
     return response;
   });
@@ -132,7 +125,6 @@ export function useSchoolAdminData() {
     dashboardStats,
     ensureLoaded,
     fetchEntity,
-    fetchTimetableGroups,
     fetchTimetableEntries,
     addEntity,
     editEntity,

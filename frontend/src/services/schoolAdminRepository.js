@@ -1,12 +1,3 @@
-// SECTION: Imports
-import {
-  generateMockTimetables,
-  listMockTimetableEntries,
-  listMockTimetableGroups,
-  swapMockTimetableEntries,
-  updateMockTimetableEntry
-} from './mocks/schoolAdminMockRepository';
-
 // SECTION: Runtime Configuration
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 
@@ -24,6 +15,28 @@ const entityEndpoints = {
 // SECTION: HTTP Request Utilities
 function buildApiUrl(path) {
   return `${API_BASE_URL}${path}`;
+}
+
+async function requestJsonFromFirstAvailable(paths, options = {}) {
+  let lastError = null;
+
+  for (const path of paths) {
+    try {
+      return await requestJson(path, options);
+    } catch (error) {
+      lastError = error;
+
+      if (error?.status && error.status !== 404 && error.status !== 405) {
+        throw error;
+      }
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  throw new Error('Request failed.');
 }
 
 async function requestJson(path, options = {}) {
@@ -97,6 +110,7 @@ const responseNormalizers = {
     teacher_id: data.teacher_id,
     group_id: data.group_id ?? data.classgroup_id,
     day: data.day,
+    slot: data.slot,
     start: data.slot
   }),
   classroom_type: (data) => ({
@@ -263,21 +277,53 @@ export async function saveBulkLessonCounts(lessonCounts) {
 
 // SECTION: Timetable API Facade
 export async function generateTimetables(payload) {
-  return generateMockTimetables(payload);
+  return requestJsonFromFirstAvailable([
+    '/timetables/generate',
+    '/timetable/generate',
+    '/generate_timetable',
+    '/classes/generate'
+  ], {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
 }
 
 export async function listTimetableGroups() {
-  return listMockTimetableGroups();
+  return listEntities('student_group');
 }
 
 export async function listTimetableEntries(groupId) {
-  return listMockTimetableEntries(groupId);
+  const classes = await listEntities('classes');
+
+  return classes.filter((entry) => {
+    if (!groupId) {
+      return true;
+    }
+
+    return String(entry.group_id) === String(groupId);
+  });
 }
 
 export async function updateTimetableEntry(groupId, entryId, payload) {
-  return updateMockTimetableEntry(groupId, entryId, payload);
+  return updateEntityInBackend('classes', entryId, payload);
 }
 
 export async function swapTimetableEntries(groupId, entryIdA, entryIdB) {
-  return swapMockTimetableEntries(groupId, entryIdA, entryIdB);
+  const entries = await listTimetableEntries(groupId);
+  const firstEntry = entries.find((entry) => entry.id === entryIdA);
+  const secondEntry = entries.find((entry) => entry.id === entryIdB);
+
+  if (!firstEntry || !secondEntry) {
+    throw new Error('Swap failed. Entry missing.');
+  }
+
+  await updateEntityInBackend('classes', firstEntry.id, {
+    day: secondEntry.day,
+    start: secondEntry.slot
+  });
+
+  return updateEntityInBackend('classes', secondEntry.id, {
+    day: firstEntry.day,
+    start: firstEntry.slot
+  });
 }

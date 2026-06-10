@@ -1,9 +1,20 @@
 <script setup>
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import AppPageHeader from '../components/AppPageHeader.vue';
 import { useSchoolAdminData } from '../composables/useSchoolAdminData';
 
-const { state, dashboardStats, ensureLoaded } = useSchoolAdminData();
+const router = useRouter();
+const { state, dashboardStats, ensureLoaded, isLoading, requestTimetableGeneration } = useSchoolAdminData();
+const generationMessage = ref('');
+
+const dashboardStatus = computed(() => {
+  if (generationMessage.value) {
+    return generationMessage.value;
+  }
+
+  return isLoading.value ? 'Generating timetable through the backend...' : '';
+});
 
 onMounted(async () => {
   await ensureLoaded();
@@ -28,6 +39,18 @@ function roomName(id) {
   const room = state.classroom.find((item) => item.id === id);
   return room ? room.name : '-';
 }
+
+async function generateTimetable() {
+  generationMessage.value = '';
+
+  try {
+    await requestTimetableGeneration({ target_group_id: 'all' });
+    generationMessage.value = 'Timetable generated successfully. Opening the management view.';
+    await router.push('/timetable-management');
+  } catch (error) {
+    generationMessage.value = error.message;
+  }
+}
 </script>
 
 <template>
@@ -51,9 +74,13 @@ function roomName(id) {
 
         <div class="quick-actions__buttons">
           <RouterLink to="/admin-data" class="btn btn-primary">Manage Master Data</RouterLink>
-          <RouterLink to="/timetable-generation" class="btn">Generate Timetables</RouterLink>
+          <button type="button" class="btn btn-primary" :disabled="isLoading" @click="generateTimetable">
+            Generate Timetable
+          </button>
+          <RouterLink to="/timetable-generation" class="btn">Timetable Generation</RouterLink>
           <RouterLink to="/timetable-management" class="btn">Manage Generated Timetables</RouterLink>
         </div>
+        <p v-if="dashboardStatus" class="muted dashboard-status">{{ dashboardStatus }}</p>
       </article>
 
       <article class="card">
