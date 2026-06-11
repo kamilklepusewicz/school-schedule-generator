@@ -8,6 +8,7 @@ const { state, isLoading, ensureLoaded, fetchTimetableEntries } = useSchoolAdmin
 const selectedPerspective = ref('groups');
 const selectedScopeId = ref('');
 const feedback = ref('');
+const timetableStartHour = 8;
 const weekDays = [
   { value: 1, label: 'Monday' },
   { value: 2, label: 'Tuesday' },
@@ -120,6 +121,12 @@ function dayName(dayValue) {
   return weekDays.find((day) => day.value === dayValue)?.label || `Day ${dayValue}`;
 }
 
+function formatHourRange(slot) {
+  const startHour = timetableStartHour + Number(slot) - 1;
+  const endHour = startHour + 1;
+  return `${String(startHour).padStart(2, '0')}:00 - ${String(endHour).padStart(2, '0')}:00`;
+}
+
 function subjectName(subjectId) {
   return state.subjects.find((item) => item.id === subjectId)?.name || '-';
 }
@@ -211,13 +218,13 @@ function scopeLabel() {
           <table class="table timetable-board">
             <thead>
               <tr>
-                <th class="hour-col">Slot</th>
+                <th class="hour-col">Hour</th>
                 <th v-for="day in weekDays" :key="day.value">{{ day.label }}</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="row in gridRows" :key="row.slot">
-                <td class="hour-col">{{ row.slot }}</td>
+                <td class="hour-col">{{ formatHourRange(row.slot) }}</td>
                 <td v-for="(cellEntries, index) in row.cells" :key="`${row.slot}-${weekDays[index].value}`">
                   <div v-if="cellEntries.length" class="lesson-stack">
                     <article v-for="lesson in cellEntries" :key="lesson.id" class="lesson-tile">
