@@ -1,25 +1,38 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import AppPageHeader from '../components/AppPageHeader.vue';
 import { useSchoolAdminData } from '../composables/useSchoolAdminData';
 
+const router = useRouter();
 const { ensureLoaded, requestTimetableGeneration, lastGenerationRequest, isLoading } = useSchoolAdminData();
-const requestStatus = ref('');
+const generationMessage = ref('');
 
 onMounted(async () => {
   await ensureLoaded();
 });
 
-const generationMessage = computed(() => lastGenerationRequest.value?.message || '');
+const generationStatus = computed(() => {
+  if (generationMessage.value) {
+    return generationMessage.value;
+  }
+
+  if (isLoading.value) {
+    return 'Generating timetable through the backend...';
+  }
+
+  return lastGenerationRequest.value?.message || '';
+});
 
 async function onGenerate() {
-  requestStatus.value = '';
+  generationMessage.value = '';
 
   try {
     await requestTimetableGeneration();
-    requestStatus.value = 'Timetable generated successfully.';
+    generationMessage.value = 'Timetable generated successfully. Opening the management view.';
+    await router.push('/timetable-management');
   } catch (error) {
-    requestStatus.value = error.message;
+    generationMessage.value = error.message;
   }
 }
 </script>
@@ -48,8 +61,8 @@ async function onGenerate() {
 
       <article class="card">
         <h2 class="section-title">Generation Status</h2>
-        <p v-if="!requestStatus && !generationMessage" class="muted">No generation request submitted yet.</p>
-        <p v-else>{{ requestStatus || generationMessage }}</p>
+        <p v-if="!generationStatus" class="muted">No generation request submitted yet.</p>
+        <p v-else>{{ generationStatus }}</p>
       </article>
     </section>
   </section>
