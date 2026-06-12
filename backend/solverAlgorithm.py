@@ -158,9 +158,3 @@ def zapisz_wyniki_do_bazy(wygenerowany_plan):
         
     finally:
         db.close()
-
-if __name__ == "__main__":
-    try:
-        algorytm_planu_lekcji()
-    except Exception as e:
-        print(f"Wystąpił błąd: {e}")
