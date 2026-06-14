@@ -1,73 +1,16 @@
-// SECTION: Imports
-import {
-  createMockEntity,
-  deleteMockEntity,
-  generateMockTimetables,
-  listMockEntities,
-  listMockTimetableEntries,
-  listMockTimetableGroups,
-  swapMockTimetableEntries,
-  updateMockEntity,
-  updateMockTimetableEntry
-} from './mocks/schoolAdminMockRepository';
-
-// SECTION: Runtime Configuration and Local Cache
+// SECTION: Runtime Configuration
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
-const localTeacherOverrides = new Map();
-const locallyDeletedTeacherIds = new Set();
-const TEACHER_OVERRIDES_STORAGE_KEY = 'schoolAdmin.teacherOverrides';
-const TEACHER_DELETIONS_STORAGE_KEY = 'schoolAdmin.teacherDeletions';
 
-// SECTION: Browser Storage Utilities
-function canUseStorage() {
-  return typeof window !== 'undefined' && Boolean(window.localStorage);
-}
-
-function loadTeacherLocalChanges() {
-  if (!canUseStorage()) {
-    return;
-  }
-
-  try {
-    const storedOverrides = window.localStorage.getItem(TEACHER_OVERRIDES_STORAGE_KEY);
-    const storedDeletions = window.localStorage.getItem(TEACHER_DELETIONS_STORAGE_KEY);
-
-    if (storedOverrides) {
-      const parsedOverrides = JSON.parse(storedOverrides);
-      Object.entries(parsedOverrides).forEach(([id, teacher]) => {
-        localTeacherOverrides.set(id, teacher);
-      });
-    }
-
-    if (storedDeletions) {
-      const parsedDeletions = JSON.parse(storedDeletions);
-      parsedDeletions.forEach((id) => locallyDeletedTeacherIds.add(id));
-    }
-  } catch {
-    localTeacherOverrides.clear();
-    locallyDeletedTeacherIds.clear();
-  }
-}
-
-function persistTeacherLocalChanges() {
-  if (!canUseStorage()) {
-    return;
-  }
-
-  const serializedOverrides = Object.fromEntries(localTeacherOverrides.entries());
-  const serializedDeletions = Array.from(locallyDeletedTeacherIds);
-
-  window.localStorage.setItem(
-    TEACHER_OVERRIDES_STORAGE_KEY,
-    JSON.stringify(serializedOverrides)
-  );
-  window.localStorage.setItem(
-    TEACHER_DELETIONS_STORAGE_KEY,
-    JSON.stringify(serializedDeletions)
-  );
-}
-
-loadTeacherLocalChanges();
+// Entity-to-endpoint mapping (matches backend routes)
+const entityEndpoints = {
+  teachers: '/teachers',
+  student_group: '/class_groups',
+  classroom: '/class_rooms',
+  subjects: '/subjects',
+  classes: '/classes',
+  classroom_type: '/classroom_types',
+  lesson_count: '/lesson_counts'
+};
 
 // SECTION: HTTP Request Utilities
 function buildApiUrl(path) {
@@ -103,170 +46,268 @@ async function requestJson(path, options = {}) {
       // Fall back to the generic HTTP status message.
     }
 
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+
+  // Handle 204 No Content responses (common for DELETE requests)
+  if (response.status === 204) {
+    return {};
   }
 
   return response.json();
 }
 
-// SECTION: API Data Mapping Utilities
-function fromApiTeacher(teacher) {
-  return {
-    id: teacher.id,
-    firstName: teacher.first_name,
-    lastName: teacher.last_name
-  };
-}
-
-function toApiTeacher(teacher) {
-  return {
-    first_name: teacher.firstName,
-    last_name: teacher.lastName
-  };
-}
+// SECTION: Response Normalization (handles field name variations from backend)
+const responseNormalizers = {
+  teachers: (data) => ({
+    id: data.id,
+    first_name: data.first_name,
+    last_name: data.last_name,
+    subject_id: data.subject_id
+  }),
+  student_group: (data) => ({
+    id: data.id,
+    name: data.name
+  }),
+  classroom: (data) => ({
+    id: data.id,
+    name: data.name,
+    classroom_type_id: data.classroom_type_id
+  }),
+  subjects: (data) => ({
+    id: data.id,
+    name: data.name,
+    classroom_type_id: data.classroom_type_id
+  }),
+  classes: (data) => ({
+    id: data.id,
+    subject_id: data.subject_id,
+    classroom_id: data.classroom_id ?? data.room_id,
+    teacher_id: data.teacher_id,
+    group_id: data.group_id ?? data.classgroup_id,
+    day: data.day,
+    slot: data.slot,
+    start: data.slot
+  }),
+  classroom_type: (data) => ({
+    id: data.id,
+    name: data.name
+  }),
+  lesson_count: (data) => ({
+    id: data.id,
+    student_group_id: data.student_group_id,
+    subject_id: data.subject_id,
+    hours: data.hours
+  })
+};
 
 // SECTION: Generic Data Utilities
-function clone(value) {
-  return JSON.parse(JSON.stringify(value));
+function normalizeListResponse(payload) {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if (Array.isArray(payload?.items)) {
+    return payload.items;
+  }
+  if (Array.isArray(payload?.data)) {
+    return payload.data;
+  }
+  throw new Error('Unexpected list response format from backend API.');
 }
 
-// SECTION: Teacher Local Override Logic
-function applyTeacherLocalChanges(teachers) {
-  return teachers
-    .filter((teacher) => !locallyDeletedTeacherIds.has(String(teacher.id)))
-    .map((teacher) => {
-      const override = localTeacherOverrides.get(String(teacher.id));
-      return override
-        ? {
-          ...teacher,
-          ...override
-        }
-        : teacher;
-    });
+async function listEntityFromBackend(entityName) {
+  const endpoint = entityEndpoints[entityName];
+  if (!endpoint) {
+    throw new Error(`Unknown entity: ${entityName}`);
+  }
+
+  const response = await requestJson(endpoint);
+  const items = normalizeListResponse(response);
+  const normalizer = responseNormalizers[entityName];
+  
+  return items.map((item) => normalizer ? normalizer(item) : item);
 }
 
-// SECTION: Teacher Entity Handler
-async function listTeachers() {
-  const teachers = await requestJson('/teachers');
-  return applyTeacherLocalChanges(teachers.map(fromApiTeacher));
-}
+async function createEntityInBackend(entityName, payload) {
+  const endpoint = entityEndpoints[entityName];
+  if (!endpoint) {
+    throw new Error(`Unknown entity: ${entityName}`);
+  }
 
-async function createTeacher(payload) {
-  const teacher = await requestJson('/teachers', {
-    method: 'POST',
-    body: JSON.stringify(toApiTeacher(payload))
+  // Normalize payload to ensure correct types and field mappings
+  let normalizedPayload = {
+    ...payload,
+    subject_id: payload.subject_id ? Number(payload.subject_id) : undefined,
+    classroom_id: payload.classroom_id ? Number(payload.classroom_id) : undefined,
+    teacher_id: payload.teacher_id ? Number(payload.teacher_id) : undefined,
+    group_id: payload.group_id ? Number(payload.group_id) : undefined
+  };
+
+  // Map frontend field names to backend field names
+  if (entityName === 'classes') {
+    if (normalizedPayload.start !== undefined) {
+      normalizedPayload.slot = normalizedPayload.start;
+      delete normalizedPayload.start;
+    }
+    delete normalizedPayload.description;
+  }
+
+  // Remove undefined fields
+  Object.keys(normalizedPayload).forEach((key) => {
+    if (normalizedPayload[key] === undefined) {
+      delete normalizedPayload[key];
+    }
   });
 
-  const normalizedTeacher = fromApiTeacher(teacher);
-  const teacherId = String(normalizedTeacher.id);
-  localTeacherOverrides.delete(teacherId);
-  locallyDeletedTeacherIds.delete(teacherId);
-  persistTeacherLocalChanges();
-  return normalizedTeacher;
+  const response = await requestJson(endpoint, {
+    method: 'POST',
+    body: JSON.stringify(normalizedPayload)
+  });
+
+  const normalizer = responseNormalizers[entityName];
+  return normalizer ? normalizer(response) : response;
 }
 
-async function updateTeacher(id, payload) {
-  const teacherId = String(id);
-  const existingTeacher = (await listTeachers())
-    .find((teacher) => String(teacher.id) === teacherId);
-
-  if (!existingTeacher) {
-    throw new Error(`Entry with id "${id}" not found.`);
+async function updateEntityInBackend(entityName, entityId, payload) {
+  const endpoint = entityEndpoints[entityName];
+  if (!endpoint) {
+    throw new Error(`Unknown entity: ${entityName}`);
   }
 
-  const nextTeacher = {
-    ...existingTeacher,
-    ...clone(payload)
+  // Normalize payload to ensure correct types
+  let normalizedPayload = {
+    ...payload,
+    subject_id: payload.subject_id ? Number(payload.subject_id) : undefined,
+    classroom_id: payload.classroom_id ? Number(payload.classroom_id) : undefined,
+    teacher_id: payload.teacher_id ? Number(payload.teacher_id) : undefined,
+    group_id: payload.group_id ? Number(payload.group_id) : undefined,
+    classroom_type_id: payload.classroom_type_id ? Number(payload.classroom_type_id) : undefined,
+    student_group_id: payload.student_group_id ? Number(payload.student_group_id) : undefined,
+    hours: payload.hours ? Number(payload.hours) : undefined,
+    day: payload.day ? Number(payload.day) : undefined,
+    start: payload.start ? Number(payload.start) : undefined
   };
 
-  localTeacherOverrides.set(teacherId, nextTeacher);
-  locallyDeletedTeacherIds.delete(teacherId);
-  persistTeacherLocalChanges();
-  return clone(nextTeacher);
-}
-
-async function deleteTeacher(id) {
-  const teacherId = String(id);
-  const existingTeacher = (await listTeachers())
-    .find((teacher) => String(teacher.id) === teacherId);
-
-  if (!existingTeacher) {
-    throw new Error(`Entry with id "${id}" not found.`);
+  // Map frontend field names to backend field names
+  if (entityName === 'classes') {
+    if (normalizedPayload.start !== undefined) {
+      normalizedPayload.slot = normalizedPayload.start;
+      delete normalizedPayload.start;
+    }
+    delete normalizedPayload.description;
   }
 
-  locallyDeletedTeacherIds.add(teacherId);
-  localTeacherOverrides.delete(teacherId);
-  persistTeacherLocalChanges();
-  return existingTeacher;
+  // Remove undefined fields
+  Object.keys(normalizedPayload).forEach((key) => {
+    if (normalizedPayload[key] === undefined) {
+      delete normalizedPayload[key];
+    }
+  });
+
+  const response = await requestJson(`${endpoint}/${entityId}`, {
+    method: 'PUT',
+    body: JSON.stringify(normalizedPayload)
+  });
+
+  const normalizer = responseNormalizers[entityName];
+  return normalizer ? normalizer(response) : response;
 }
 
-// SECTION: Entity Handler Registry
-const defaultEntityHandler = {
-  list: (entityName) => listMockEntities(entityName),
-  create: (entityName, payload) => createMockEntity(entityName, payload),
-  update: (entityName, id, payload) => updateMockEntity(entityName, id, payload),
-  remove: (entityName, id) => deleteMockEntity(entityName, id)
-};
-
-const entityHandlerOverrides = {
-  teachers: {
-    list: () => listTeachers(),
-    create: (_, payload) => createTeacher(payload),
-    update: (_, id, payload) => updateTeacher(id, payload),
-    remove: (_, id) => deleteTeacher(id)
-  }
-};
-
-function resolveEntityHandler(entityName) {
-  const override = entityHandlerOverrides[entityName];
-  if (!override) {
-    return defaultEntityHandler;
+async function deleteEntityInBackend(entityName, entityId) {
+  const endpoint = entityEndpoints[entityName];
+  if (!endpoint) {
+    throw new Error(`Unknown entity: ${entityName}`);
   }
 
-  return {
-    ...defaultEntityHandler,
-    ...override
-  };
+  await requestJson(`${endpoint}/${entityId}`, {
+    method: 'DELETE'
+  });
+
+  return { id: entityId };
 }
 
-// SECTION: Entity API Facade
+// SECTION: Entity API Facade (direct exports)
 export async function listEntities(entityName) {
-  const handler = resolveEntityHandler(entityName);
-  return handler.list(entityName);
+  return listEntityFromBackend(entityName);
 }
 
 export async function createEntity(entityName, payload) {
-  const handler = resolveEntityHandler(entityName);
-  return handler.create(entityName, payload);
+  return createEntityInBackend(entityName, payload);
 }
 
-export async function updateEntity(entityName, id, payload) {
-  const handler = resolveEntityHandler(entityName);
-  return handler.update(entityName, id, payload);
+export async function updateEntity(entityName, entityId, payload) {
+  return updateEntityInBackend(entityName, entityId, payload);
 }
 
-export async function deleteEntity(entityName, id) {
-  const handler = resolveEntityHandler(entityName);
-  return handler.remove(entityName, id);
+export async function deleteEntity(entityName, entityId) {
+  return deleteEntityInBackend(entityName, entityId);
+}
+
+export async function saveBulkLessonCounts(lessonCounts) {
+  const response = await requestJson('/lesson_counts/batch', {
+    method: 'POST',
+    body: JSON.stringify(lessonCounts)
+  });
+  return response;
 }
 
 // SECTION: Timetable API Facade
-export async function generateTimetables(payload) {
-  return generateMockTimetables(payload);
+export async function generateTimetables() {
+  return requestJson('/schedule/generate', {
+    method: 'POST'
+  });
 }
 
 export async function listTimetableGroups() {
-  return listMockTimetableGroups();
+  return listEntities('student_group');
 }
 
-export async function listTimetableEntries(groupId) {
-  return listMockTimetableEntries(groupId);
+export async function listTimetableEntries(scopeType, scopeId) {
+  const classes = await listEntities('classes');
+
+  const scopeKeyMap = {
+    groups: 'group_id',
+    teachers: 'teacher_id',
+    classrooms: 'classroom_id'
+  };
+
+  if (scopeId === undefined) {
+    return classes.filter((entry) => String(entry.group_id) === String(scopeType));
+  }
+
+  const scopeKey = scopeKeyMap[scopeType] || 'group_id';
+
+  return classes.filter((entry) => {
+    if (!scopeId) {
+      return true;
+    }
+
+    return String(entry[scopeKey]) === String(scopeId);
+  });
 }
 
 export async function updateTimetableEntry(groupId, entryId, payload) {
-  return updateMockTimetableEntry(groupId, entryId, payload);
+  return updateEntityInBackend('classes', entryId, payload);
 }
 
 export async function swapTimetableEntries(groupId, entryIdA, entryIdB) {
-  return swapMockTimetableEntries(groupId, entryIdA, entryIdB);
+  const entries = await listTimetableEntries(groupId);
+  const firstEntry = entries.find((entry) => entry.id === entryIdA);
+  const secondEntry = entries.find((entry) => entry.id === entryIdB);
+
+  if (!firstEntry || !secondEntry) {
+    throw new Error('Swap failed. Entry missing.');
+  }
+
+  await updateEntityInBackend('classes', firstEntry.id, {
+    day: secondEntry.day,
+    start: secondEntry.slot
+  });
+
+  return updateEntityInBackend('classes', secondEntry.id, {
+    day: firstEntry.day,
+    start: firstEntry.slot
+  });
 }

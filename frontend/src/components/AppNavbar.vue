@@ -13,6 +13,15 @@
       <li>
         <RouterLink to="/admin-data" class="app-link" active-class="is-active">Data Management</RouterLink>
       </li>
+      <li>
+        <RouterLink to="/admin-data-wizard" class="app-link" active-class="is-active">Guided Setup</RouterLink>
+      </li>
+      <li>
+        <RouterLink to="/timetable-generation" class="app-link" active-class="is-active">Timetable Generation</RouterLink>
+      </li>
+      <li>
+        <RouterLink to="/timetable-management" class="app-link" active-class="is-active">Timetable Management</RouterLink>
+      </li>
       <!-- <li>
         <RouterLink to="/style-guide" class="app-link" active-class="is-active">Style Guide</RouterLink>
       </li> -->

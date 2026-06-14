@@ -1,35 +1,46 @@
 // SECTION: Imports
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import {
   createEntity,
   deleteEntity,
   generateTimetables,
   listEntities,
   listTimetableEntries,
-  listTimetableGroups,
   swapTimetableEntries,
+  updateEntity,
   updateTimetableEntry,
-  updateEntity
+  saveBulkLessonCounts,
 } from '../services/schoolAdminRepository';
 
 // SECTION: Shared Reactive State
 const state = reactive({
   teachers: [],
-  classGroups: [],
-  classRooms: [],
+  student_group: [],
+  classroom: [],
   subjects: [],
   classes: [],
-  timetableGroups: [],
+  classroom_type: [],
+  lesson_count: [],
   timetableEntries: []
 });
 
 // SECTION: Entity Configuration
-const entityKeys = ['teachers', 'classGroups', 'classRooms', 'subjects', 'classes'];
+const entityKeys = ['teachers', 'student_group', 'classroom', 'subjects', 'classes', 'classroom_type', 'lesson_count'];
 
 // SECTION: Request Status Flags
 const isLoading = ref(false);
 const isInitialized = ref(false);
 const lastGenerationRequest = ref(null);
+
+// SECTION: Utility Helper for Loading State Management
+async function withLoading(asyncFn) {
+  isLoading.value = true;
+  try {
+    return await asyncFn();
+  } finally {
+    isLoading.value = false;
+  }
+}
 
 // SECTION: Data Loading Helpers
 async function fetchEntity(entityName) {
@@ -41,100 +52,69 @@ async function ensureLoaded() {
     return;
   }
 
-  isLoading.value = true;
-
-  try {
+  await withLoading(async () => {
     await Promise.all(entityKeys.map((entityName) => fetchEntity(entityName)));
-    state.timetableGroups = await listTimetableGroups();
     isInitialized.value = true;
-  } finally {
-    isLoading.value = false;
-  }
+  });
 }
 
-async function fetchTimetableGroups() {
-  state.timetableGroups = await listTimetableGroups();
-}
-
-async function fetchTimetableEntries(groupId) {
-  state.timetableEntries = await listTimetableEntries(groupId);
+async function fetchTimetableEntries(scopeType, scopeId) {
+  state.timetableEntries = await listTimetableEntries(scopeType, scopeId);
 }
 
 // SECTION: Entity Mutation Operations
 async function addEntity(entityName, payload) {
-  isLoading.value = true;
-  try {
+  await withLoading(async () => {
     await createEntity(entityName, payload);
     await fetchEntity(entityName);
-  } finally {
-    isLoading.value = false;
-  }
+  });
 }
 
-async function editEntity(entityName, id, payload) {
-  isLoading.value = true;
-  try {
-    const updatedEntity = await updateEntity(entityName, id, payload);
-
-    if (entityName === 'teachers') {
-      state.teachers = state.teachers.map((teacher) => (
-        String(teacher.id) === String(id)
-          ? {
-            ...teacher,
-            ...updatedEntity
-          }
-          : teacher
-      ));
-    }
-
+async function editEntity(entityName, entityId, payload) {
+  await withLoading(async () => {
+    await updateEntity(entityName, entityId, payload);
     await fetchEntity(entityName);
-  } finally {
-    isLoading.value = false;
-  }
+  });
 }
 
-async function removeEntity(entityName, id) {
-  isLoading.value = true;
-  try {
-    await deleteEntity(entityName, id);
+async function removeEntity(entityName, entityId) {
+  await withLoading(async () => {
+    await deleteEntity(entityName, entityId);
     await fetchEntity(entityName);
-  } finally {
-    isLoading.value = false;
-  }
+  });
 }
 
 // SECTION: Timetable Operations
-async function requestTimetableGeneration(payload) {
-  isLoading.value = true;
-  try {
-    const response = await generateTimetables(payload);
-    await fetchTimetableGroups();
+async function requestTimetableGeneration() {
+  return await withLoading(async () => {
+    const response = await generateTimetables();
+    await fetchEntity('classes');
     lastGenerationRequest.value = response;
     return response;
-  } finally {
-    isLoading.value = false;
-  }
+  });
 }
 
 async function moveTimetableEntry(groupId, entryId, payload) {
-  isLoading.value = true;
-  try {
+  await withLoading(async () => {
     await updateTimetableEntry(groupId, entryId, payload);
-    await fetchTimetableEntries(groupId);
-  } finally {
-    isLoading.value = false;
-  }
+    await fetchTimetableEntries('groups', groupId);
+  });
 }
 
 async function swapTimetableEntriesById(groupId, firstId, secondId) {
-  isLoading.value = true;
-  try {
+  await withLoading(async () => {
     await swapTimetableEntries(groupId, firstId, secondId);
-    await fetchTimetableEntries(groupId);
-  } finally {
-    isLoading.value = false;
-  }
+    await fetchTimetableEntries('groups', groupId);
+  });
 }
+
+const dashboardStats = computed(() => [
+  { key: 'teachers', label: 'Teachers', value: state.teachers.length },
+  { key: 'student_group', label: 'Student Groups', value: state.student_group.length },
+  { key: 'classroom', label: 'Classrooms', value: state.classroom.length },
+  { key: 'subjects', label: 'Subjects', value: state.subjects.length },
+  { key: 'classes', label: 'Classes', value: state.classes.length }
+]);
 
 // SECTION: Public Composable API
 export function useSchoolAdminData() {
@@ -142,15 +122,16 @@ export function useSchoolAdminData() {
     state,
     isLoading,
     lastGenerationRequest,
+    dashboardStats,
     ensureLoaded,
     fetchEntity,
-    fetchTimetableGroups,
     fetchTimetableEntries,
     addEntity,
     editEntity,
     removeEntity,
     requestTimetableGeneration,
     moveTimetableEntry,
-    swapTimetableEntriesById
+    swapTimetableEntriesById,
+    saveBulkLessonCounts
   };
 }

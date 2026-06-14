@@ -28,17 +28,17 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['create', 'update', 'delete']);
+const emit = defineEmits(['create', 'edit', 'delete']);
 
 const formState = reactive({});
-const mode = reactive({ type: 'create', id: null });
+const editingId = ref(null);
 const pageSizeOptions = [10, 20, 50];
 const selectedPageSize = ref(pageSizeOptions[0]);
 const displayedCount = ref(pageSizeOptions[0]);
 
 function getDefaultValue(field) {
   if (field.type === 'number') {
-    return 0;
+    return field.key === 'hours' ? 0 : 0;
   }
   return '';
 }
@@ -47,8 +47,6 @@ function resetForm() {
   props.fields.forEach((field) => {
     formState[field.key] = getDefaultValue(field);
   });
-  mode.type = 'create';
-  mode.id = null;
 }
 
 watch(
@@ -92,6 +90,17 @@ function displayValue(row, field) {
     return option ? option.label : '-';
   }
 
+  // Format day of week
+  if (field.key === 'day' && typeof raw === 'number') {
+    const days = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    return days[raw] || `-`;
+  }
+
+  // Format start hour
+  if (field.key === 'start' && typeof raw === 'number') {
+    return `${String(raw).padStart(2, '0')}:00`;
+  }
+
   return raw;
 }
 
@@ -107,41 +116,38 @@ function normalizePayload() {
 }
 
 function submitForm() {
-  const payload = normalizePayload();
-
-  if (mode.type === 'edit') {
-    emit('update', {
+  if (editingId.value) {
+    emit('edit', {
       entityName: props.entityName,
-      id: mode.id,
-      payload
+      entityId: editingId.value,
+      payload: normalizePayload()
     });
-    return;
+    editingId.value = null;
+  } else {
+    emit('create', {
+      entityName: props.entityName,
+      payload: normalizePayload()
+    });
   }
-
-  emit('create', {
-    entityName: props.entityName,
-    payload
-  });
 }
 
-function loadRowForEdit(row) {
+function startEdit(row) {
+  editingId.value = row.id;
   props.fields.forEach((field) => {
     formState[field.key] = row[field.key];
   });
-
-  mode.type = 'edit';
-  mode.id = row.id;
 }
 
-function onDelete(rowId) {
+function cancelEdit() {
+  editingId.value = null;
+  resetForm();
+}
+
+function deleteRow(rowId) {
   emit('delete', {
     entityName: props.entityName,
-    id: rowId
+    entityId: rowId
   });
-
-  if (mode.id === rowId) {
-    resetForm();
-  }
 }
 </script>
 
@@ -176,17 +182,22 @@ function onDelete(rowId) {
             v-model="formState[field.key]"
             :type="field.type === 'number' ? 'number' : field.type"
             class="control"
+            :min="field.min"
+            :max="field.max"
             :required="field.required !== false"
           />
         </label>
 
         <div class="actions-row">
           <button type="submit" class="btn btn-primary" :disabled="busy">
-            {{ mode.type === 'edit' ? 'Save Changes' : 'Add Entry' }}
+            {{ editingId ? 'Update Entry' : 'Add Entry' }}
           </button>
-          <button type="button" class="btn" :disabled="busy" @click="resetForm">Reset</button>
+          <button type="button" class="btn" :disabled="busy" @click="editingId ? cancelEdit() : resetForm">
+            {{ editingId ? 'Cancel' : 'Reset' }}
+          </button>
         </div>
       </form>
+      <p v-if="editingId" class="editing-note">Editing entry ID: {{ editingId }}</p>
     </article>
 
     <article class="card">
@@ -212,21 +223,19 @@ function onDelete(rowId) {
           <thead>
             <tr>
               <th v-for="field in fields" :key="field.key">{{ field.label }}</th>
-              <th>Actions</th>
+              <th class="actions-col">Actions</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="row in visibleRows" :key="row.id">
               <td v-for="field in fields" :key="field.key">{{ displayValue(row, field) }}</td>
-              <td>
-                <div class="row-actions">
-                  <button type="button" class="btn" :disabled="busy" @click="loadRowForEdit(row)">
-                    Edit
-                  </button>
-                  <button type="button" class="btn btn-danger" :disabled="busy" @click="onDelete(row.id)">
-                    Delete
-                  </button>
-                </div>
+              <td class="actions-col">
+                <button class="btn btn-small btn-edit" :disabled="busy" @click="startEdit(row)" title="Edit">
+                  ✎
+                </button>
+                <button class="btn btn-small btn-delete" :disabled="busy" @click="deleteRow(row.id)" title="Delete">
+                  ✕
+                </button>
               </td>
             </tr>
           </tbody>
@@ -294,6 +303,15 @@ function onDelete(rowId) {
   color: var(--color-text-muted);
 }
 
+.editing-note {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-accent-soft);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  color: var(--color-accent-strong);
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -307,15 +325,33 @@ function onDelete(rowId) {
   gap: 0.55rem;
 }
 
-.row-actions {
-  display: flex;
-  gap: 0.45rem;
+.actions-col {
+  width: 90px;
+  text-align: center;
 }
 
-.btn-danger {
-  border-color: var(--color-danger);
-  color: var(--color-danger);
-  background: color-mix(in srgb, var(--color-danger) 8%, white);
+.btn-small {
+  padding: 0.35rem 0.55rem;
+  font-size: 0.875rem;
+  min-width: auto;
+}
+
+.btn-edit {
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+}
+
+.btn-edit:hover:not(:disabled) {
+  background: var(--color-accent-soft);
+}
+
+.btn-delete {
+  border-color: var(--color-danger, #ff4757);
+  color: var(--color-danger, #ff4757);
+}
+
+.btn-delete:hover:not(:disabled) {
+  background: rgba(255, 71, 87, 0.1);
 }
 
 @media (max-width: 900px) {
